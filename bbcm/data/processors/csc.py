@@ -1,7 +1,7 @@
 """
 @Time   :   2021-01-29 18:27:21
 @File   :   csc.py
-@Author :   Abtion
+@Author :   Abtion, okcd00
 @Email  :   abtion{at}outlook.com
 """
 import gc
@@ -77,7 +77,15 @@ def read_data(fp):
                     elif line.strip().startswith('<'):
                         item.append(line.strip())
 
+def read_cd_data(fp):
+    # other pre-processed csc datasets
+    # a list of items with keys ['id', 'original_text', 'wrong_ids', 'correct_text']
+    for fn in os.listdir(fp):
+        if fn.endswith('cd.json'):
+            samples = json.load(open(os.path.join(fp, fn), 'r', encoding='utf-8', errors='ignore'))
+            yield samples
 
+                        
 def read_confusion_data(fp):
     fn = os.path.join(fp, 'train.sgml')
     with open(fn, 'r', encoding='utf8') as f:
@@ -191,13 +199,17 @@ def preproc():
     convertor = opencc.OpenCC('tw2sp.json')
     test_items = proc_test_set(get_abs_path('datasets', 'csc'), convertor)
     
-    # generate samples from "*ing.sgml" files
+    # generate samples from "*ing.sgml" files (SIGHAN sgml files)
     rst_items += [proc_item(item, convertor)
                   for item in read_data(get_abs_path('datasets', 'csc'))]
     
-    # generate samples from "*train.sgml" files
+    # generate samples from "*train.sgml" files (the ACG sgml file)
     rst_items += [proc_confusion_item(item, id_prefix='cf', id_postfix=str(_i)) 
                   for _i, item in enumerate(read_confusion_data(get_abs_path('datasets', 'csc')))]
+    
+    # extend samples from "*cd.json" files (custom csc_data json files)
+    for custom_data in read_cd_data(get_abs_path('datasets', 'csc')):
+        rst_items += custom_data
 
     # 拆分训练集与测试集
     dev_set_len = len(rst_items) // 10
