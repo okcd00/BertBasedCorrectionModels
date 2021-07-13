@@ -15,60 +15,6 @@ from tqdm import tqdm
 from bbcm.utils import dump_json, get_abs_path
 
 
-def proc_item(item, convertor):
-    root = etree.XML(item)
-    passages = dict()
-    mistakes = []
-    for passage in root.xpath('/ESSAY/TEXT/PASSAGE'):
-        passages[passage.get('id')] = convertor.convert(passage.text)
-    for mistake in root.xpath('/ESSAY/MISTAKE'):
-        mistakes.append({'id': mistake.get('id'),
-                         'location': int(mistake.get('location')) - 1,
-                         'wrong': convertor.convert(mistake.xpath('./WRONG/text()')[0].strip()),
-                         'correction': convertor.convert(mistake.xpath('./CORRECTION/text()')[0].strip())})
-
-    rst_items = dict()
-
-    def get_passages_by_id(pgs, _id):
-        p = pgs.get(_id)
-        if p:
-            return p
-        _id = _id[:-1] + str(int(_id[-1]) + 1)
-        p = pgs.get(_id)
-        if p:
-            return p
-        raise ValueError(f'passage not found by {_id}')
-
-    for mistake in mistakes:
-        if mistake['id'] not in rst_items.keys():
-            rst_items[mistake['id']] = {'original_text': get_passages_by_id(passages, mistake['id']),
-                                        'wrong_ids': [],
-                                        'correct_text': get_passages_by_id(passages, mistake['id'])}
-
-        # todo 繁体转简体字符数量或位置发生改变校验
-
-        ori_text = rst_items[mistake['id']]['original_text']
-        cor_text = rst_items[mistake['id']]['correct_text']
-        if len(ori_text) == len(cor_text):
-            if ori_text[mistake['location']] in mistake['wrong']:
-                rst_items[mistake['id']]['wrong_ids'].append(mistake['location'])
-                wrong_char_idx = mistake['wrong'].index(ori_text[mistake['location']])
-                start = mistake['location'] - wrong_char_idx
-                end = start + len(mistake['wrong'])
-                rst_items[mistake['id']][
-                    'correct_text'] = f'{cor_text[:start]}{mistake["correction"]}{cor_text[end:]}'
-        else:
-            print(f'{mistake["id"]}\n{ori_text}\n{cor_text}')
-    rst = []
-    for k in rst_items.keys():
-        if len(rst_items[k]['correct_text']) == len(rst_items[k]['original_text']):
-            rst.append({'id': k, **rst_items[k]})
-        else:
-            text = rst_items[k]['correct_text']
-            rst.append({'id': k, 'correct_text': text, 'original_text': text, 'wrong_ids': []})
-    return rst
-
-
 def proc_test_set(fp, convertor):
     """
     生成sighan15的测试集
@@ -143,8 +89,62 @@ def read_confusion_data(fp):
             elif line.strip().startswith('<'):
                 item.append(line.strip())
 
+                
+def proc_item(item, convertor, id_prefix="", id_postfix=""):
+    root = etree.XML(item)
+    passages = dict()
+    mistakes = []
+    for passage in root.xpath('/ESSAY/TEXT/PASSAGE'):
+        passages[passage.get('id')] = convertor.convert(passage.text)
+    for mistake in root.xpath('/ESSAY/MISTAKE'):
+        mistakes.append({'id': mistake.get('id'),
+                         'location': int(mistake.get('location')) - 1,
+                         'wrong': convertor.convert(mistake.xpath('./WRONG/text()')[0].strip()),
+                         'correction': convertor.convert(mistake.xpath('./CORRECTION/text()')[0].strip())})
 
-def proc_confusion_item(item):
+    rst_items = dict()
+
+    def get_passages_by_id(pgs, _id):
+        p = pgs.get(_id)
+        if p:
+            return p
+        _id = _id[:-1] + str(int(_id[-1]) + 1)
+        p = pgs.get(_id)
+        if p:
+            return p
+        raise ValueError(f'passage not found by {_id}')
+
+    for mistake in mistakes:
+        if mistake['id'] not in rst_items.keys():
+            rst_items[mistake['id']] = {'original_text': get_passages_by_id(passages, mistake['id']),
+                                        'wrong_ids': [],
+                                        'correct_text': get_passages_by_id(passages, mistake['id'])}
+
+        # todo 繁体转简体字符数量或位置发生改变校验
+
+        ori_text = rst_items[mistake['id']]['original_text']
+        cor_text = rst_items[mistake['id']]['correct_text']
+        if len(ori_text) == len(cor_text):
+            if ori_text[mistake['location']] in mistake['wrong']:
+                rst_items[mistake['id']]['wrong_ids'].append(mistake['location'])
+                wrong_char_idx = mistake['wrong'].index(ori_text[mistake['location']])
+                start = mistake['location'] - wrong_char_idx
+                end = start + len(mistake['wrong'])
+                rst_items[mistake['id']][
+                    'correct_text'] = f'{cor_text[:start]}{mistake["correction"]}{cor_text[end:]}'
+        else:
+            print(f'{mistake["id"]}\n{ori_text}\n{cor_text}')
+    rst = []
+    for k in rst_items.keys():
+        if len(rst_items[k]['correct_text']) == len(rst_items[k]['original_text']):
+            rst.append({'id': k, **rst_items[k]})
+        else:
+            text = rst_items[k]['correct_text']
+            rst.append({'id': k, 'correct_text': text, 'original_text': text, 'wrong_ids': []})
+    return rst
+
+
+def proc_confusion_item(item, id_prefix="", id_postfix=""):
     """
     处理confusionset数据集
     Args:
@@ -167,19 +167,19 @@ def proc_confusion_item(item):
         wrong_ids.append(mis['location'])
 
     rst = [{
-        'id': '-',
+        'id': '{}-{}'.format(str(id_prefix), str(id_postfix)),
         'original_text': text,
         'wrong_ids': wrong_ids,
         'correct_text': cor_text
     }]
     if len(text) != len(cor_text):
-        return [{'id': '--',
+        return [{'id': '{}--{}'.format(str(id_prefix), str(id_postfix)),
                  'original_text': cor_text,
                  'wrong_ids': [],
                  'correct_text': cor_text}]
     # 取一定概率保留原文本
     if random.random() < 0.01:
-        rst.append({'id': '--',
+        rst.append({'id': '{}--{}'.format(str(id_prefix), str(id_postfix)),
                     'original_text': cor_text,
                     'wrong_ids': [],
                     'correct_text': cor_text})
@@ -190,12 +190,16 @@ def preproc():
     rst_items = []
     convertor = opencc.OpenCC('tw2sp.json')
     test_items = proc_test_set(get_abs_path('datasets', 'csc'), convertor)
-    for item in read_data(get_abs_path('datasets', 'csc')):
-        rst_items += proc_item(item, convertor)
-    for item in read_confusion_data(get_abs_path('datasets', 'csc')):
-        rst_items += proc_confusion_item(item)
+    
+    # generate samples from "*ing.sgml" files
+    rst_items += [proc_item(item, convertor)
+                  for item in read_data(get_abs_path('datasets', 'csc'))]
+    
+    # generate samples from "*train.sgml" files
+    rst_items += [proc_confusion_item(item, id_prefix='cf', id_postfix=str(_i)) 
+                  for _i, item in enumerate(read_confusion_data(get_abs_path('datasets', 'csc')))]
 
-    # 拆分训练与测试
+    # 拆分训练集与测试集
     dev_set_len = len(rst_items) // 10
     print(len(rst_items))
     random.seed(666)
