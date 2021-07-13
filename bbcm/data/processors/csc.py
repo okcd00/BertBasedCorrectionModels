@@ -16,6 +16,13 @@ from tqdm import tqdm
 from bbcm.utils import dump_json, get_abs_path
 
 
+def flatten(nested_list, unique=False):
+    ret = [elem for sub_list in nested_list for elem in sub_list]
+    if unique:
+        return list(set(ret))
+    return ret
+
+
 def proc_test_set(fp, convertor):
     """
     生成sighan15的测试集
@@ -198,20 +205,27 @@ def proc_confusion_item(item, id_prefix="", id_postfix=""):
 def preproc():
     rst_items = []
     convertor = opencc.OpenCC('tw2sp.json')
+    
+    # generate samples from SIGHAN15-Test as test-data.
     test_items = proc_test_set(get_abs_path('datasets', 'csc'), convertor)
     
     # generate samples from "*ing.sgml" files (SIGHAN sgml files)
-    rst_items += [proc_item(item, convertor)
-                  for item in read_data(get_abs_path('datasets', 'csc'))]
+    sighan_samples = [proc_item(item, convertor)
+                      for item in read_data(get_abs_path('datasets', 'csc'))]
+    rst_items += flatten(sighan_samples)
     
     # generate samples from "*train.sgml" files (the ACG sgml file)
-    rst_items += [proc_confusion_item(item, id_prefix='cf', id_postfix=str(_i)) 
-                  for _i, item in enumerate(read_confusion_data(get_abs_path('datasets', 'csc')))]
+    confusion_samples = [proc_confusion_item(item, id_prefix='cf', id_postfix=str(_i)) 
+                         for _i, item in enumerate(read_confusion_data(get_abs_path('datasets', 'csc')))]
+    rst_items += flatten(confusion_samples)
     
     # extend samples from "*cd.json" files (custom csc_data json files)
     for custom_data in read_cd_data(get_abs_path('datasets', 'csc')):
         rst_items += custom_data
 
+    # print("sighan samples count:", len(sighan_samples))
+    # print("confusion samples count:", len(confusion_samples))
+    
     # 拆分训练集与测试集
     dev_set_len = len(rst_items) // 10
     print(len(rst_items))
