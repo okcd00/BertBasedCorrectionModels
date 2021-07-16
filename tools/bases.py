@@ -65,10 +65,24 @@ def train(config, model, loaders, ckpt_callback=None):
         None
     """
     train_loader, valid_loader, test_loader = loaders
+    gpus = None if config.MODEL.DEVICE == 'cpu' else config.MODEL.GPU_IDS
+    
+    """
+    INTRO for distributed_backend
+        Lightning supports two backends. DataParallel and DistributedDataParallel. 
+        Both can be used for single-node multi-GPU training. 
+        For multi-node training you must use DistributedDataParallel.
+    """
+    dist_backend = None
+    if len(gpus) > 1:  
+        # dist_backend = 'dp'  # Data Parallel (DP) for single-node multiple gpus
+        # dist_backend = 'ddp2'  # Distributed Data Parallel-2 (DDP2) for negative sampling
+        dist_backend = 'ddp'  # Distributed Data Parallel (DDP) as default
     trainer = pl.Trainer(max_epochs=config.SOLVER.MAX_EPOCHS,
-                         gpus=None if config.MODEL.DEVICE == 'cpu' else config.MODEL.GPU_IDS,
+                         gpus=gpus,
                          accumulate_grad_batches=config.SOLVER.ACCUMULATE_GRAD_BATCHES,
-                         callbacks=[ckpt_callback])
+                         callbacks=[ckpt_callback],
+                         distributed_backend=dist_backend)
     # 满足以下条件才进行训练
     # 1. 配置文件中要求进行训练
     # 2. train_loader不为空
