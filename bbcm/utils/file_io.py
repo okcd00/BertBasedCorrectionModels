@@ -26,7 +26,8 @@ __all__ = ["PathManager",
            "get_cache_dir",
            "get_abs_path",
            "dump_json",
-           "load_json"]
+           "load_json",
+           "flatten"]
 
 
 def get_cache_dir(cache_dir: Optional[str] = None) -> str:
@@ -564,3 +565,10 @@ def get_abs_path(*name):
     if os.path.isabs(fn):
         return fn
     return os.path.abspath(os.path.join(get_main_dir(), fn))
+
+
+def flatten(nested_list, unique=False):
+    ret = [elem for sub_list in nested_list for elem in sub_list]
+    if unique:
+        return list(set(ret))
+    return ret

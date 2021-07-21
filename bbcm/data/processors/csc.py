@@ -6,16 +6,23 @@
 """
 import gc
 import os
+import json
 import random
 
 import opencc
 from lxml import etree
 from tqdm import tqdm
 
-from bbcm.utils import dump_json, get_abs_path
+from bbcm.utils import flatten, dump_json, load_json, get_abs_path
 
 
 def proc_item(item, convertor):
+    """
+    处理 sighan 数据集 (SIGHAN13-15)
+    Args:
+        item:
+    Returns:
+    """
     root = etree.XML(item)
     passages = dict()
     mistakes = []
@@ -69,9 +76,51 @@ def proc_item(item, convertor):
     return rst
 
 
+def proc_confusion_item(item, id_prefix="", id_postfix=""):
+    """
+    处理 confusionset 数据集 (AutoCorpusGeneration)
+    Args:
+        item:
+    Returns:
+    """
+    root = etree.XML(item)
+    text = root.xpath('/SENTENCE/TEXT/text()')[0]
+    mistakes = []
+    for mistake in root.xpath('/SENTENCE/MISTAKE'):
+        mistakes.append({'location': int(mistake.xpath('./LOCATION/text()')[0]) - 1,
+                         'wrong': mistake.xpath('./WRONG/text()')[0].strip(),
+                         'correction': mistake.xpath('./CORRECTION/text()')[0].strip()})
+
+    cor_text = text
+    wrong_ids = []
+
+    for mis in mistakes:
+        cor_text = f'{cor_text[:mis["location"]]}{mis["correction"]}{cor_text[mis["location"] + 1:]}'
+        wrong_ids.append(mis['location'])
+
+    rst = [{
+        'id': f'{id_prefix}-{id_postfix}',
+        'original_text': text,
+        'wrong_ids': wrong_ids,
+        'correct_text': cor_text
+    }]
+    if len(text) != len(cor_text):
+        return [{'id': f'{id_prefix}--{id_postfix}',
+                 'original_text': cor_text,
+                 'wrong_ids': [],
+                 'correct_text': cor_text}]
+    # 取一定概率保留原文本
+    if random.random() < 0.01:
+        rst.append({'id': f'{id_prefix}--{id_postfix}',
+                    'original_text': cor_text,
+                    'wrong_ids': [],
+                    'correct_text': cor_text})
+    return rst
+
+
 def proc_test_set(fp, convertor):
     """
-    生成sighan15的测试集
+    采用 SIGHAN15_CSC_Test 以生成测试集
     Args:
         fp:
         convertor:
@@ -115,11 +164,11 @@ def proc_test_set(fp, convertor):
                             'original_text': original_text,
                             'wrong_ids': wrong_ids,
                             'correct_text': cor_text})
-
     return rst
 
 
 def read_data(fp):
+    # read corpus from SIGHAN13-15 (*ing.sgml)
     for fn in os.listdir(fp):
         if fn.endswith('ing.sgml'):
             with open(os.path.join(fp, fn), 'r', encoding='utf-8', errors='ignore') as f:
@@ -133,6 +182,7 @@ def read_data(fp):
 
 
 def read_confusion_data(fp):
+    # read AutoCorpusGeneration corpus released from the EMNLP2018 paper
     fn = os.path.join(fp, 'train.sgml')
     with open(fn, 'r', encoding='utf8') as f:
         item = []
@@ -144,51 +194,27 @@ def read_confusion_data(fp):
                 item.append(line.strip())
 
 
-def proc_confusion_item(item):
-    """
-    处理confusionset数据集
-    Args:
-        item:
-    Returns:
-    """
-    root = etree.XML(item)
-    text = root.xpath('/SENTENCE/TEXT/text()')[0]
-    mistakes = []
-    for mistake in root.xpath('/SENTENCE/MISTAKE'):
-        mistakes.append({'location': int(mistake.xpath('./LOCATION/text()')[0]) - 1,
-                         'wrong': mistake.xpath('./WRONG/text()')[0].strip(),
-                         'correction': mistake.xpath('./CORRECTION/text()')[0].strip()})
-
-    cor_text = text
-    wrong_ids = []
-
-    for mis in mistakes:
-        cor_text = f'{cor_text[:mis["location"]]}{mis["correction"]}{cor_text[mis["location"] + 1:]}'
-        wrong_ids.append(mis['location'])
-
-    rst = [{
-        'id': '-',
-        'original_text': text,
-        'wrong_ids': wrong_ids,
-        'correct_text': cor_text
-    }]
-    if len(text) != len(cor_text):
-        return [{'id': '--',
-                 'original_text': cor_text,
-                 'wrong_ids': [],
-                 'correct_text': cor_text}]
-    # 取一定概率保留原文本
-    if random.random() < 0.01:
-        rst.append({'id': '--',
-                    'original_text': cor_text,
-                    'wrong_ids': [],
-                    'correct_text': cor_text})
-    return rst
+def read_cd_data(fp, file_postfix='_cd.json', ignore_files=list()):
+    # other pre-processed csc datasets
+    # a list of items with keys ['id', 'original_text', 'wrong_ids', 'correct_text']
+    for fn in os.listdir(fp):
+        ign_flag = False
+        for ign_fn in ignore_files:
+            if fn in ign_fn:
+                ign_flag = True
+        if ign_flag:
+            continue
+        if fn.endswith(file_postfix):
+            with open(os.path.join(fp, fn), 'r',
+                      encoding='utf-8', errors='ignore') as f:
+                samples = json.load(f)
+                yield samples
 
 
 def preproc():
     rst_items = []
     convertor = opencc.OpenCC('tw2sp.json')
+
     test_items = proc_test_set(get_abs_path('datasets', 'csc'), convertor)
     for item in read_data(get_abs_path('datasets', 'csc')):
         rst_items += proc_item(item, convertor)
@@ -198,6 +224,35 @@ def preproc():
     # 拆分训练与测试
     dev_set_len = len(rst_items) // 10
     print(len(rst_items))
+    random.seed(666)
+    random.shuffle(rst_items)
+    dump_json(rst_items[:dev_set_len], get_abs_path('datasets', 'csc', 'dev.json'))
+    dump_json(rst_items[dev_set_len:], get_abs_path('datasets', 'csc', 'train.json'))
+    dump_json(test_items, get_abs_path('datasets', 'csc', 'test.json'))
+    gc.collect()
+
+
+def preproc_cd():
+    rst_items = []
+    dir_path = get_abs_path('datasets', 'csc')
+
+    # generate test samples from ys_data or SIGHAN-15Test.
+    test_file_path = get_abs_path(dir_path, 'ys_test.json')
+    test_items = load_json(test_file_path)
+
+    # generate samples from AutoCorpusGeneration dataset (train.sgml).
+    confusion_samples = [proc_confusion_item(item, id_prefix='cf', id_postfix=str(_i))
+                         for _i, item in enumerate(read_confusion_data(dir_path))]
+    rst_items += flatten(confusion_samples)
+
+    # generate samples from pre-processed samples (*_cd.json).
+    ignore_files = []  # ['15test_cd.json']
+    for custom_samples in read_cd_data(dir_path, ignore_files=ignore_files):
+        rst_items += proc_confusion_item(custom_samples)
+
+    # Split into train dataset and valid dataset.
+    dev_set_len = len(rst_items) // 10
+    print(f"Dump {len(rst_items) * 9} samples as train and {len(rst_items)} samples as dev.")
     random.seed(666)
     random.shuffle(rst_items)
     dump_json(rst_items[:dev_set_len], get_abs_path('datasets', 'csc', 'dev.json'))

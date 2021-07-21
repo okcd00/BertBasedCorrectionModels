@@ -7,16 +7,17 @@
 import sys
 sys.path.append('..')
 
-from bbcm.data.loaders.collator import DataCollatorForCsc
+from transformers import BertTokenizer
 from pytorch_lightning.callbacks import ModelCheckpoint
+
+from bases import args_parse, train
 from bbcm.data.build import make_loaders
 from bbcm.data.loaders import get_csc_loader
+from bbcm.data.loaders.collator import DataCollatorForCsc, DynamicDataCollatorForCsc
+from bbcm.data.processors.csc import preproc, preproc_cd
 from bbcm.modeling.csc import SoftMaskedBertModel
 from bbcm.modeling.csc.modeling_bert4csc import BertForCsc
-from transformers import BertTokenizer
-from bases import args_parse, train
 from bbcm.utils import get_abs_path
-from bbcm.data.processors.csc import preproc
 import os
 
 
@@ -25,9 +26,11 @@ def main():
 
     # 如果不存在训练文件则先处理数据
     if not os.path.exists(get_abs_path(cfg.DATASETS.TRAIN)):
-        preproc()
+        # preproc()
+        preproc_cd()
     tokenizer = BertTokenizer.from_pretrained(cfg.MODEL.BERT_CKPT)
     collator = DataCollatorForCsc(tokenizer=tokenizer)
+    # collator = DynamicDataCollatorForCsc(tokenizer=tokenizer)
     if cfg.MODEL.NAME in ["bert4csc", "macbert4csc"]:
         model = BertForCsc(cfg, tokenizer)
     else:
