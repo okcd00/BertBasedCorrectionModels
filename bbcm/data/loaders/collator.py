@@ -34,32 +34,48 @@ class DataCollatorForCsc:
 class DynamicDataCollatorForCsc(DataCollatorForCsc):
     def __init__(self, tokenizer, augmentation=False):
         super(DynamicDataCollatorForCsc, self).__init__(tokenizer)
+        self.first_epoch = True
         self.augmentation = augmentation
         self.char_confusion_set = {}
         self.word_confusion_set = {}
-        # TODO
+        self.load_sighan_confusion_set()
+
+    def load_sighan_confusion_set(self):
+        sighan_cf_path = '/home/chendian/BBCM/datasets/sighan_confusion.txt'
+        for line in open(sighan_cf_path, 'r'):
+            key, val = line.strip().split(':')
+            self.char_confusion_set.setdefault(key, [])
+            self.char_confusion_set[key].extend([c for c in val])
+
+    def change_words(self, word, correct_word=None):
+        if len(word) == 1:
+            candidates = self.char_confusion_set.get(word, [])
+            can = deepcopy(candidates)
+            if correct_word and correct_word in can:
+                can.remove(correct_word)
+            return random.choice(can) if can else word
+        # TODO: modify words with word_confusion_set
+        return word
 
     def sample_augment(self, ori_text, cor_text, wrong_ids):
         # change ori_text here
         ori_text_case, cor_text_case, wrong_ids_case = [], cor_text, []
         for o, c, w in zip(ori_text, cor_text, wrong_ids):
-            ot = deepcopy(o)
-            wr_ids = deepcopy(w)
+            ot, wr_ids = deepcopy(o), deepcopy(w)
             for wid in w:
-                o_char = o[wid]
-                candidates = self.char_confusion_set.get(o_char)
-                # TODO: modify words with word_confusion_set
-                ot[wid] = random.choice(candidates)
+                ot[wid] = self.change_words(word=o[wid], correct_word=c[wid])
                 wr_ids.append(wid)
             ori_text_case.append(ot)
             wrong_ids_case.append(wr_ids)
         return ori_text_case, cor_text_case, wrong_ids_case
 
     def __call__(self, data):
-        if self.augmentation:
+        # return the original samples for the first epoch
+        if self.augmentation and not self.first_epoch:
             ori_texts, cor_texts, wrong_idss = self.sample_augment(*zip(*data))
         else:
             ori_texts, cor_texts, wrong_idss = zip(*data)
+        self.first_epoch = False
 
         encoded_texts = [self.tokenizer.tokenize(t) for t in ori_texts]
         max_len = max([len(t) for t in encoded_texts]) + 2

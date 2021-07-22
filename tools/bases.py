@@ -90,3 +90,47 @@ def train(config, model, loaders, ckpt_callback=None):
         if (ckpt_path is not None) and os.path.exists(ckpt_path):
             model.load_state_dict(torch.load(ckpt_path)['state_dict'])
         trainer.test(model, test_loader)
+
+
+def dynamic_train(config, model, loaders, ckpt_callback=None):
+    """
+    训练
+    Args:
+        config: 配置
+        model: 模型
+        loaders: 各个数据的loader，包含train，valid，test
+        ckpt_callback: 按需保存模型的callback，如为空则默认每个epoch保存一次模型。
+    Returns:
+        None
+    """
+    logs = {}
+    train_loader, valid_loader, test_loader = loaders
+    trainer = pl.Trainer(max_epochs=config.SOLVER.MAX_EPOCHS,
+                         gpus=None if config.MODEL.DEVICE == 'cpu' else config.MODEL.GPU_IDS,
+                         accumulate_grad_batches=config.SOLVER.ACCUMULATE_GRAD_BATCHES,
+                         callbacks=[ckpt_callback])
+    # 满足以下条件才进行训练
+    # 1. 配置文件中要求进行训练
+    # 2. train_loader不为空
+    # 3. train_loader中有数据
+    for epoch in range(config.SOLVER.MAX_EPOCHS):
+        logs[epoch] = []
+        if 'train' in config.MODE and train_loader and len(train_loader) > 0:
+            if valid_loader and len(valid_loader) > 0:
+                trainer.fit(model, train_loader, valid_loader)
+            else:
+                trainer.fit(model, train_loader)
+
+        trainer.test(model, train_loader)
+        # 是否进行测试的逻辑同训练
+        if 'test' in config.MODE and test_loader and len(test_loader) > 0:
+            if ckpt_callback and len(ckpt_callback.best_model_path) > 0:
+                ckpt_path = ckpt_callback.best_model_path
+            elif len(config.MODEL.WEIGHTS) > 0:
+                ckpt_path = get_abs_path(config.OUTPUT_DIR, config.MODEL.WEIGHTS)
+            else:
+                ckpt_path = None
+            print(ckpt_path)
+            # if (ckpt_path is not None) and os.path.exists(ckpt_path):
+            #     model.load_state_dict(torch.load(ckpt_path)['state_dict'])
+            trainer.test(model, test_loader)

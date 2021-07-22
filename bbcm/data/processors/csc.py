@@ -13,6 +13,8 @@ import opencc
 from lxml import etree
 from tqdm import tqdm
 
+import torch
+from torch.utils.data import random_split
 from bbcm.utils import flatten, dump_json, load_json, get_abs_path
 
 
@@ -78,7 +80,7 @@ def proc_item(item, convertor):
 
 def proc_confusion_item(item, id_prefix="", id_postfix=""):
     """
-    处理 confusionset 数据集 (AutoCorpusGeneration)
+    处理 confusion set 数据集 (AutoCorpusGeneration)
     Args:
         item:
     Returns:
@@ -239,6 +241,7 @@ def preproc():
     # 拆分训练集与测试集
     dev_set_len = len(rst_items) // 10
     print(len(rst_items))
+
     random.seed(666)
     random.shuffle(rst_items)
     dump_json(rst_items[:dev_set_len], get_abs_path('datasets', 'csc', 'dev.json'))
@@ -252,7 +255,7 @@ def preproc_cd():
     dir_path = get_abs_path('datasets', 'csc')
 
     # generate test samples from ys_data or SIGHAN-15Test.
-    test_file_path = get_abs_path(dir_path, 'ys_test.json')
+    test_file_path = get_abs_path(dir_path, 'ys_test.json')  # '15test_cd.json'
     test_items = load_json(test_file_path)
 
     # generate samples from AutoCorpusGeneration dataset (train.sgml).
@@ -263,14 +266,13 @@ def preproc_cd():
     # generate samples from pre-processed samples (*_cd.json).
     ignore_files = []  # ['15test_cd.json']
     for custom_samples in read_cd_data(dir_path, ignore_files=ignore_files):
-        rst_items += proc_confusion_item(custom_samples)
+        rst_items += custom_samples
 
     # Split into train dataset and valid dataset.
-    dev_set_len = len(rst_items) // 10
-    print(f"Dump {len(rst_items) * 9} samples as train and {len(rst_items)} samples as dev.")
-    random.seed(666)
-    random.shuffle(rst_items)
-    dump_json(rst_items[:dev_set_len], get_abs_path('datasets', 'csc', 'dev.json'))
-    dump_json(rst_items[dev_set_len:], get_abs_path('datasets', 'csc', 'train.json'))
+    train_items, dev_items = random_split(rst_items, [9, 1],
+                                          generator=torch.Generator().manual_seed(666))
+    print(f"Dump {len(train_items) * 9} samples as train and {len(dev_items)} samples as dev.")
+    dump_json(dev_items, get_abs_path('datasets', 'csc', 'dev.json'))
+    dump_json(train_items, get_abs_path('datasets', 'csc', 'train.json'))
     dump_json(test_items, get_abs_path('datasets', 'csc', 'test.json'))
     gc.collect()
