@@ -121,7 +121,11 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
             else:
                 trainer.fit(model, train_loader)
 
-        trainer.test(model, train_loader)
+        # test on train set.
+        from bbcm.data.build import get_train_loader
+        for ep in range(0, epoch+1):
+            train_loader = get_train_loader(cfg=config, ep=epoch)
+            trainer.test(model, train_loader)
         # 是否进行测试的逻辑同训练
         if 'test' in config.MODE and test_loader and len(test_loader) > 0:
             if ckpt_callback and len(ckpt_callback.best_model_path) > 0:

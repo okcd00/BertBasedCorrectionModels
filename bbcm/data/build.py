@@ -6,15 +6,18 @@
 """
 
 from bbcm.utils import get_abs_path
+from bbcm.data.loaders import get_csc_loader
 from bbcm.data.loaders.collator import DataCollatorForCsc, DynamicDataCollatorForCsc
 
 
-def get_train_loader(cfg, get_loader_fn, ep=0, **kwargs):
+def get_train_loader(cfg, get_loader_fn=None, ep=0, **kwargs):
     # single function for changing from different datasets.
     if ep > 0:
-        path = get_abs_path(cfg.DATASETS.TRAIN, f"ep{ep}")
+        path = get_abs_path(cfg.DATASETS.TRAIN) + f".ep{ep}"
     else:
         path = get_abs_path(cfg.DATASETS.TRAIN)
+    if get_loader_fn is None:
+        get_loader_fn = get_csc_loader
     train_loader = get_loader_fn(path,
                                  batch_size=cfg.SOLVER.BATCH_SIZE,
                                  shuffle=True,
@@ -22,6 +25,7 @@ def get_train_loader(cfg, get_loader_fn, ep=0, **kwargs):
                                  # _collate_fn=_collate_fn,
                                  **kwargs)
     return train_loader
+
 
 def get_dynamic_loader(cfg, get_loader_fn, **kwargs):
     path = get_abs_path(cfg.DATASETS.TRAIN)

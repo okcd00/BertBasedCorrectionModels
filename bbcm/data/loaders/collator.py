@@ -47,6 +47,16 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
             self.char_confusion_set.setdefault(key, [])
             self.char_confusion_set[key].extend([c for c in val])
 
+    def load_word_confusion_set(self):
+        # tx_corpus = '/home/chendian/BBCM/datasets/'
+
+        # TODO: pre-processing words with tx embeddings
+        # https://ai.tencent.com/ailab/nlp/zh/embedding.html
+
+        # TODO: pre-processing words with
+        # https://github.com/fighting41love/funNLP/tree/master/data
+        pass
+
     def change_words(self, word, correct_word=None):
         if len(word) == 1:
             candidates = self.char_confusion_set.get(word, [])
@@ -68,6 +78,9 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
             ori_text_case.append(ot)
             wrong_ids_case.append(wr_ids)
         return ori_text_case, cor_text_case, wrong_ids_case
+
+    def samples(self):
+        return []
 
     def __call__(self, data):
         # return the original samples for the first epoch
