@@ -76,7 +76,12 @@ def load_model(args):
     return model
 
 
-def inference(args):
+def evaluate(args, test_loader='test'):
+    model = load_model(args)
+    model.evaluate_from_loader(loader=test_loader)
+
+
+def inference(args, detail=False):
     model = load_model(args)
     texts = []
     if os.path.exists(args.text_file):
@@ -85,7 +90,7 @@ def inference(args):
                 texts.append(line.strip())
     else:
         texts = args.texts
-    corrected_texts = model.predict(texts)
+    corrected_texts = model.predict(texts, detail)
     print(corrected_texts)
     return corrected_texts
 

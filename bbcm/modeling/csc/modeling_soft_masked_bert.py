@@ -141,8 +141,10 @@ class SoftMaskedBertModel(CscTrainingModel):
             active_probs = prob.view(-1, prob.shape[1])[active_loss]
             active_labels = det_labels[active_loss]
             det_loss = det_loss_fct(active_probs, active_labels.float())
+            # 检错loss，纠错loss，检错输出，纠错输出，纠错hidden
             outputs = (det_loss, cor_out[0], prob.squeeze(-1)) + cor_out[1:]
         else:
+            # 检错输出，纠错输出
             outputs = (prob.squeeze(-1),) + cor_out
 
         return outputs

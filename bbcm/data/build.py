@@ -27,8 +27,10 @@ def get_train_loader(cfg, get_loader_fn=None, ep=0, **kwargs):
     return train_loader
 
 
-def get_dynamic_loader(cfg, get_loader_fn, **kwargs):
+def get_dynamic_loader(cfg, get_loader_fn=None, **kwargs):
     path = get_abs_path(cfg.DATASETS.TRAIN)
+    if get_loader_fn is None:
+        get_loader_fn = get_csc_loader
     loader = get_loader_fn(path,
                            batch_size=cfg.SOLVER.BATCH_SIZE,
                            shuffle=True,
@@ -38,7 +40,10 @@ def get_dynamic_loader(cfg, get_loader_fn, **kwargs):
     return loader
 
 
-def make_loaders(cfg, get_loader_fn, **kwargs):
+def make_loaders(cfg, get_loader_fn=None, **kwargs):
+    if get_loader_fn is None:
+        get_loader_fn = get_csc_loader
+
     if cfg.DATASETS.TRAIN == '':
         train_loader = None
     else:
