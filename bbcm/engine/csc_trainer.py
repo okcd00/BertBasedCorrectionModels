@@ -4,9 +4,10 @@
 @Author :   Abtion
 @Email  :   abtion{at}outlook.com
 """
-import operator
 import torch
+import operator
 import numpy as np
+from transformers import BertTokenizer
 from bbcm.utils.evaluations import compute_corrector_prf, compute_sentence_level_prf
 from .bases import BaseTrainingEngine
 
@@ -20,7 +21,7 @@ class CscTrainingModel(BaseTrainingEngine):
         super().__init__(cfg, *args, **kwargs)
         # loss weight for cor & det
         self.w = cfg.MODEL.HYPER_PARAMS[0]
-        self.cfg = cfg
+        self.tokenizer = BertTokenizer.from_pretrained(cfg.MODEL.BERT_CKPT)
         # threshold for prediction judgment
         self.judge_line = 0.5
 
@@ -88,8 +89,12 @@ class CscTrainingModel(BaseTrainingEngine):
     def evaluate_from_loader(self, loader):
         outputs = []
         if isinstance(loader, str):
+            from bbcm.data.loaders.collator import DataCollatorForCsc
+            _collate_fn = DataCollatorForCsc(tokenizer=self.tokenizer)
+
             from bbcm.data.build import make_loaders
-            trn, dev, tst = make_loaders(self.cfg)
+            trn, dev, tst = make_loaders(cfg=self.cfg,
+                                         _collate_fn=_collate_fn)
             loader = {
                 'train': trn,
                 'dev': dev,
