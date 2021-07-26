@@ -92,7 +92,7 @@ def compute_corrector_prf(results, logger, on_detected=True):
                                      'correction', logger=logger)
     # common metrics to compare with other baseline methods.
     _, _, correction_cf1 = report_prf(TP, FP, FN + n_misreported,
-                                     'correction_common', logger=logger)
+                                      'correction_common', logger=logger)
     if not on_detected:
         correction_f1 = correction_cf1
     return detection_f1, correction_f1

@@ -21,6 +21,7 @@ class CscTrainingModel(BaseTrainingEngine):
         super().__init__(cfg, *args, **kwargs)
         # loss weight for cor & det
         self.w = cfg.MODEL.HYPER_PARAMS[0]
+        self.device = torch.device(cfg.MODEL.DEVICE)
         self.tokenizer = BertTokenizer.from_pretrained(cfg.MODEL.BERT_CKPT)
         # threshold for prediction judgment
         self.judge_line = 0.5
@@ -58,7 +59,7 @@ class CscTrainingModel(BaseTrainingEngine):
 
         return loss.cpu().item(), det_acc_labels, cor_acc_labels, results
 
-    def validation_epoch_end(self, outputs) -> None:
+    def validation_epoch_end(self, outputs):
         det_acc_labels = []
         cor_acc_labels = []
         results = []
@@ -75,9 +76,9 @@ class CscTrainingModel(BaseTrainingEngine):
                           f'acc: {np.mean(det_acc_labels):.4f}')
         self._logger.info(f'Correction:\n'
                           f'acc: {np.mean(cor_acc_labels):.4f}')
-        compute_corrector_prf(results, self._logger, on_detected=True)
+        det_f1, cor_f1 = compute_corrector_prf(results, self._logger, on_detected=True)
         compute_sentence_level_prf(results, self._logger)
-        return results
+        return det_f1, cor_f1
 
     def test_step(self, batch, batch_idx):
         return self.validation_step(batch, batch_idx)
@@ -102,9 +103,11 @@ class CscTrainingModel(BaseTrainingEngine):
                 'test': tst
             }.get(loader, tst)
         for b_idx, batch in enumerate(loader):
+            ori_texts, cor_texts, det_labels = batch
+            batch = (ori_texts, cor_texts, det_labels.to(self.cfg.MODEL.DEVICE))
             outputs.append(self.validation_step(batch, b_idx))
-        results = self.validation_epoch_end(outputs)
-        return results
+        det_f1, cor_f1 = self.validation_epoch_end(outputs)
+        return det_f1, cor_f1
 
     def predict(self, texts, detail=False):
         inputs = self.tokenizer(texts, padding=True, return_tensors='pt')
