@@ -6,7 +6,21 @@
 """
 
 
-def compute_corrector_prf(results, logger):
+def report_prf(tp, fp, fn, phase, logger):
+    # For the detection Precision, Recall and F1
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    if precision + recall == 0:
+        f1_score = 0
+    else:
+        f1_score = 2 * (precision * recall) / (precision + recall)
+    logger.info(f"The {phase} result is:\n")
+    logger.info(f"precision={precision}, recall={recall} and F1={f1_score}\n")
+    logger.info(f"support: TP={tp}, FP={fp}, FN={fn}\n")
+    return precision, recall, f1_score
+
+
+def compute_corrector_prf(results, logger, on_detected=True):
     """
     copy from https://github.com/sunnyqiny/Confusionset-guided-Pointer-Networks-for-Chinese-Spelling-Check/blob/master/utils/evaluation_metrics.py
     """
@@ -46,23 +60,19 @@ def compute_corrector_prf(results, logger):
         all_predict_true_index.append(each_true_index)
 
     # For the detection Precision, Recall and F1
-    detection_precision = TP / (TP + FP) if (TP + FP) > 0 else 0
-    detection_recall = TP / (TP + FN) if (TP + FN) > 0 else 0
-    if detection_precision + detection_recall == 0:
-        detection_f1 = 0
-    else:
-        detection_f1 = 2 * (detection_precision * detection_recall) / (detection_precision + detection_recall)
-    logger.info(
-        "The detection result is precision={}, recall={} and F1={}".format(detection_precision, detection_recall,
-                                                                           detection_f1))
+    _, _, detection_f1 = report_prf(TP, FP, FN,
+                                    'detection', logger=logger)
+
+    # store FN counts
+    n_misreported = int(FN)
 
     TP = 0
     FP = 0
     FN = 0
 
+    # we only detect those correctly detected location, which is a different from the common metrics since
+    # we wanna to see the precision improve by using the confusion set
     for i in range(len(all_predict_true_index)):
-        # we only detect those correctly detected location, which is a different from the common metrics since
-        # we wanna to see the precision improve by using the confusionset
         if len(all_predict_true_index[i]) > 0:
             predict_words = []
             for j in all_predict_true_index[i]:
@@ -78,16 +88,13 @@ def compute_corrector_prf(results, logger):
                     FN += 1
 
     # For the correction Precision, Recall and F1
-    correction_precision = TP / (TP + FP) if (TP + FP) > 0 else 0
-    correction_recall = TP / (TP + FN) if (TP + FN) > 0 else 0
-    if correction_precision + correction_recall == 0:
-        correction_f1 = 0
-    else:
-        correction_f1 = 2 * (correction_precision * correction_recall) / (correction_precision + correction_recall)
-    logger.info("The correction result is precision={}, recall={} and F1={}".format(correction_precision,
-                                                                                    correction_recall,
-                                                                                    correction_f1))
-
+    _, _, correction_f1 = report_prf(TP, FP, FN,
+                                     'correction', logger=logger)
+    # common metrics to compare with other baseline methods.
+    _, _, correction_cf1 = report_prf(TP, FP, FN + n_misreported,
+                                     'correction_common', logger=logger)
+    if not on_detected:
+        correction_f1 = correction_cf1
     return detection_f1, correction_f1
 
 
