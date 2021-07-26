@@ -21,7 +21,6 @@ class CscTrainingModel(BaseTrainingEngine):
         super().__init__(cfg, *args, **kwargs)
         # loss weight for cor & det
         self.w = cfg.MODEL.HYPER_PARAMS[0]
-        self.device = torch.device(cfg.MODEL.DEVICE)
         self.tokenizer = BertTokenizer.from_pretrained(cfg.MODEL.BERT_CKPT)
         # threshold for prediction judgment
         self.judge_line = 0.5
@@ -52,9 +51,10 @@ class CscTrainingModel(BaseTrainingEngine):
             _src = self.tokenizer(src, add_special_tokens=False)['input_ids']
             _tgt = tgt[1:len(_src) + 1].cpu().numpy().tolist()
             _predict = predict[1:len(_src) + 1].cpu().numpy().tolist()
-            cor_acc_labels.append(1 if operator.eq(_tgt, _predict) else 0)
+            cor_acc_labels.append(operator.eq(_tgt, _predict).float())
             # counts for correctly-detected tokens only
-            det_acc_labels.append(det_predict[1:len(_src) + 1].equal(det_label[1:len(_src) + 1]))
+            # det_acc_labels.append(det_predict[1:len(_src) + 1].equal(det_label[1:len(_src) + 1]))
+            det_acc_labels.append(det_predict[1:len(_src) + 1].eq(det_label[1:len(_src) + 1]).float())
             results.append((_src, _tgt, _predict,))
 
         return loss.cpu().item(), det_acc_labels, cor_acc_labels, results
