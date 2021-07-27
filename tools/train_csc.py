@@ -10,8 +10,8 @@ sys.path.append('..')
 from transformers import BertTokenizer
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from .bases import args_parse, train
-from bbcm.data.build import make_loaders, make_dynamic_loaders
+from bases import args_parse, train
+from bbcm.data.build import make_loaders, get_dynamic_loader
 from bbcm.data.loaders import get_csc_loader
 from bbcm.data.loaders.collator import DataCollatorForCsc, DynamicDataCollatorForCsc
 from bbcm.data.processors.csc import preproc, preproc_cd

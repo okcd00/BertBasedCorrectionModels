@@ -109,10 +109,6 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
                          gpus=None if config.MODEL.DEVICE == 'cpu' else config.MODEL.GPU_IDS,
                          accumulate_grad_batches=config.SOLVER.ACCUMULATE_GRAD_BATCHES,
                          callbacks=[ckpt_callback])
-    # 满足以下条件才进行训练
-    # 1. 配置文件中要求进行训练
-    # 2. train_loader不为空
-    # 3. train_loader中有数据
 
     from transformers import BertTokenizer
     tokenizer = BertTokenizer.from_pretrained(cfg.MODEL.BERT_CKPT)
@@ -132,10 +128,11 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
                 trainer.fit(model, train_loader)
 
         # test on train set.
-        for ep in range(0, epoch + 1):
-            train_loader = get_train_loader(cfg=config, ep=epoch+1)
+        for ep in range(epoch, -1, -1):
+            if ep != epoch:  # test on current epoch.
+                train_loader = get_train_loader(cfg=config, ep=epoch+1)
             trainer.test(model, train_loader)
-        # 是否进行测试的逻辑同训练
+
         if 'test' in config.MODE and test_loader and len(test_loader) > 0:
             if ckpt_callback and len(ckpt_callback.best_model_path) > 0:
                 ckpt_path = ckpt_callback.best_model_path
