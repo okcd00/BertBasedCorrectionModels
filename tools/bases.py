@@ -113,8 +113,18 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
     # 1. 配置文件中要求进行训练
     # 2. train_loader不为空
     # 3. train_loader中有数据
+
+    from transformers import BertTokenizer
+    tokenizer = BertTokenizer.from_pretrained(cfg.MODEL.BERT_CKPT)
+
+    from bbcm.data.loaders.collator import DataCollatorForCsc
+    _collate_fn = DataCollatorForCsc(tokenizer=tokenizer)
+
+    from bbcm.data.build import get_train_loader
     for epoch in range(config.SOLVER.MAX_EPOCHS):
         logs[epoch] = []
+        train_loader = get_train_loader(
+            cfg=config, ep=epoch+1, _collate_fn=_collate_fn)
         if 'train' in config.MODE and train_loader and len(train_loader) > 0:
             if valid_loader and len(valid_loader) > 0:
                 trainer.fit(model, train_loader, valid_loader)
@@ -122,9 +132,8 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
                 trainer.fit(model, train_loader)
 
         # test on train set.
-        from bbcm.data.build import get_train_loader
         for ep in range(0, epoch + 1):
-            train_loader = get_train_loader(cfg=config, ep=epoch)
+            train_loader = get_train_loader(cfg=config, ep=epoch+1)
             trainer.test(model, train_loader)
         # 是否进行测试的逻辑同训练
         if 'test' in config.MODE and test_loader and len(test_loader) > 0:

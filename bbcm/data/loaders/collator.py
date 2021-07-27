@@ -57,7 +57,7 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
         # https://github.com/fighting41love/funNLP/tree/master/data
         pass
 
-    def change_words(self, word, correct_word=None):
+    def change_words(self, word, correct_word=None, sentence=None):
         if len(word) == 1:
             candidates = self.char_confusion_set.get(word, [])
             can = deepcopy(candidates)
@@ -73,14 +73,37 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
         for o, c, w in zip(ori_text, cor_text, wrong_ids):
             ot, wr_ids = deepcopy(o), deepcopy(w)
             for wid in w:
-                ot[wid] = self.change_words(word=o[wid], correct_word=c[wid])
+                cw = self.change_words(
+                    word=o[wid], correct_word=c[wid], sentence=c)
+                ot = f"{ot[:wid]}{cw}{ot[wid+1:]}"
                 wr_ids.append(wid)
             ori_text_case.append(ot)
             wrong_ids_case.append(wr_ids)
         return ori_text_case, cor_text_case, wrong_ids_case
 
     def samples(self):
-        return []
+        return [sample for s_idx, sample in enumerate(self)]
+
+    def generate_csc_augmented_samples(self, csc_data_path):
+        import json
+        csc_origin_data = json.load(open(csc_data_path, 'r'))
+        augmented_samples = []
+        for sample in csc_origin_data:
+            w = sample['wrong_ids']
+            o, c = sample['original_text'], sample['correct_text']
+            ot, wr_ids = deepcopy(o), deepcopy(w)
+            for wid in w:
+                cw = self.change_words(
+                    word=o[wid], correct_word=c[wid], sentence=c)
+                ot = f"{ot[:wid]}{cw}{ot[wid+1:]}"
+                wr_ids.append(wid)
+            augmented_samples.append({
+                'id': sample['id'],
+                'original_text': ot,
+                'wrong_ids': sample['wrong_ids'],
+                'correct_text': c,
+            })
+        return augmented_samples
 
     def __call__(self, data):
         # return the original samples for the first epoch

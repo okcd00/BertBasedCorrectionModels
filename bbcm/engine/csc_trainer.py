@@ -25,6 +25,10 @@ class CscTrainingModel(BaseTrainingEngine):
         # threshold for prediction judgment
         self.judge_line = 0.5
 
+    @staticmethod
+    def pt2list(_tensor):
+        return _tensor.cpu().numpy().tolist()
+
     def training_step(self, batch, batch_idx):
         ori_text, cor_text, det_labels = batch
         outputs = self.forward(ori_text, cor_text, det_labels)
@@ -49,15 +53,21 @@ class CscTrainingModel(BaseTrainingEngine):
         cor_acc_labels = []
         for src, tgt, predict, det_predict, det_label in zip(ori_text, cor_y, cor_y_hat, det_y_hat, det_labels):
             _src = self.tokenizer(src, add_special_tokens=False)['input_ids']
-            _tgt = tgt[1:len(_src) + 1].cpu().numpy().tolist()
-            _predict = predict[1:len(_src) + 1].cpu().numpy().tolist()
-            cor_acc_labels.append([float(_t == _p) for _t, _p in zip(_tgt, _predict)])
-            # counts for correctly-detected tokens only
-            # det_acc_labels.append(det_predict[1:len(_src) + 1].equal(det_label[1:len(_src) + 1]))
-            pred_det = det_predict[1:len(_src) + 1]
-            label_det = det_label[1:len(_src) + 1]
-            det_acc_labels.append(pred_det.eq(label_det).float())
-            results.append((_src, _tgt, _predict,))
+
+            # whether a token from correction is the same as the truth token.
+            c_tgt = self.pt2list(tgt[1:len(_src) + 1])
+            c_predict = self.pt2list(predict[1:len(_src) + 1])
+            cor_acc_arr = [int(_t == _p) for _t, _p in zip(c_tgt, c_predict)]
+            cor_acc_labels.append(cor_acc_arr)
+
+            # whether a token from detection is the same as the truth token.
+            d_tgt = self.pt2list(det_label[1:len(_src) + 1])
+            d_predict = self.pt2list(det_predict[1:len(_src) + 1])
+            det_acc_arr = [int(_t == _p) for _t, _p in zip(d_tgt, d_predict)]
+            det_acc_labels.append(det_acc_arr)
+
+            # a tuple of lists
+            results.append((_src, c_tgt, c_predict, d_predict))
 
         return loss.cpu().item(), det_acc_labels, cor_acc_labels, results
 
@@ -74,13 +84,15 @@ class CscTrainingModel(BaseTrainingEngine):
         loss = np.mean([out[0] for out in outputs])
         self.log('val_loss', loss)
         self._logger.info(f'loss: {loss}')
+        det_acc = np.mean(det_acc_labels)
         self._logger.info(f'Detection:\n'
-                          f'acc: {np.mean(det_acc_labels):.4f}')
+                          f'acc: {det_acc:.4f}')
+        cor_acc = np.mean(cor_acc_labels)
         self._logger.info(f'Correction:\n'
-                          f'acc: {np.mean(cor_acc_labels):.4f}')
+                          f'acc: {cor_acc:.4f}')
         det_f1, cor_f1 = compute_corrector_prf(results, self._logger, on_detected=True)
         compute_sentence_level_prf(results, self._logger)
-        return det_f1, cor_f1
+        return det_acc, cor_acc, det_f1, cor_f1
 
     def test_step(self, batch, batch_idx):
         return self.validation_step(batch, batch_idx)
@@ -108,8 +120,7 @@ class CscTrainingModel(BaseTrainingEngine):
             ori_texts, cor_texts, det_labels = batch
             batch = (ori_texts, cor_texts, det_labels.to(self.cfg.MODEL.DEVICE))
             outputs.append(self.validation_step(batch, b_idx))
-        det_f1, cor_f1 = self.validation_epoch_end(outputs)
-        return det_f1, cor_f1
+        return self.validation_epoch_end(outputs)
 
     def predict(self, texts, detail=False):
         inputs = self.tokenizer(texts, padding=True, return_tensors='pt')

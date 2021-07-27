@@ -22,7 +22,9 @@ def report_prf(tp, fp, fn, phase, logger):
 
 def compute_corrector_prf(results, logger, on_detected=True):
     """
-    copy from https://github.com/sunnyqiny/Confusionset-guided-Pointer-Networks-for-Chinese-Spelling-Check/blob/master/utils/evaluation_metrics.py
+    References:
+        https://github.com/sunnyqiny/
+        Confusionset-guided-Pointer-Networks-for-Chinese-Spelling-Check/blob/master/utils/evaluation_metrics.py
     """
     TP = 0
     FP = 0
@@ -30,15 +32,16 @@ def compute_corrector_prf(results, logger, on_detected=True):
     all_predict_true_index = []
     all_gold_index = []
     for item in results:
-        src, tgt, predict = item
+        src, tgt, predict, d_predict = item
+
         gold_index = []
-        each_true_index = []
         for i in range(len(list(src))):
             if src[i] == tgt[i]:
                 continue
             else:
                 gold_index.append(i)
         all_gold_index.append(gold_index)
+
         predict_index = []
         for i in range(len(list(src))):
             if src[i] == predict[i]:
@@ -46,6 +49,7 @@ def compute_corrector_prf(results, logger, on_detected=True):
             else:
                 predict_index.append(i)
 
+        each_true_index = []
         for i in predict_index:
             if i in gold_index:
                 TP += 1
@@ -112,7 +116,7 @@ def compute_sentence_level_prf(results, logger):
     total_num = len(results)
 
     for item in results:
-        src, tgt, predict = item
+        src, tgt, predict, _ = item
 
         # 负样本
         if src == tgt:
