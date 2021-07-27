@@ -105,10 +105,6 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
     """
     logs = {}
     train_loader, valid_loader, test_loader = loaders
-    trainer = pl.Trainer(max_epochs=config.SOLVER.MAX_EPOCHS,
-                         gpus=None if config.MODEL.DEVICE == 'cpu' else config.MODEL.GPU_IDS,
-                         accumulate_grad_batches=config.SOLVER.ACCUMULATE_GRAD_BATCHES,
-                         callbacks=[ckpt_callback])
 
     from transformers import BertTokenizer
     tokenizer = BertTokenizer.from_pretrained(cfg.MODEL.BERT_CKPT)
@@ -118,6 +114,10 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
 
     from bbcm.data.build import get_train_loader
     for epoch in range(config.SOLVER.MAX_EPOCHS):
+        trainer = pl.Trainer(max_epochs=1,  # train one single epoch
+                             gpus=None if config.MODEL.DEVICE == 'cpu' else config.MODEL.GPU_IDS,
+                             accumulate_grad_batches=config.SOLVER.ACCUMULATE_GRAD_BATCHES,
+                             callbacks=[ckpt_callback])
         train_loader = get_train_loader(
             cfg=config, ep=epoch+1, _collate_fn=_collate_fn)
         if 'train' in config.MODE and train_loader and len(train_loader) > 0:
@@ -129,12 +129,11 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
         # test on train set.
         logs[epoch] = []
         for ep in range(epoch, -1, -1):
-            print(f"Test on {ep}-th epoch")
+            print(f"\n=====Test on {ep}-th epoch=====\n")
             if ep != epoch:  # test on current epoch.
                 train_loader = get_train_loader(
                     cfg=config, ep=epoch+1, _collate_fn=_collate_fn)
             res = trainer.test(model, train_loader)
-
             logs[epoch].append(res)
 
         if 'test' in config.MODE and test_loader and len(test_loader) > 0:

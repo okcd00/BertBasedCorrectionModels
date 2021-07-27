@@ -105,7 +105,7 @@ class CscTrainingModel(BaseTrainingEngine):
         return self.validation_step(batch, batch_idx)
 
     def test_epoch_end(self, outputs):
-        self._logger.info('\nTest.\n')
+        self._logger.info('\n=======Test=======\n')
         return self.validation_epoch_end(outputs)
 
     def evaluate_from_loader(self, loader):
