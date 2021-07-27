@@ -259,9 +259,9 @@ def preproc_cd():
     test_items = load_json(test_file_path)
 
     # generate samples from AutoCorpusGeneration dataset (train.sgml).
-    confusion_samples = [proc_confusion_item(item, id_prefix='cf', id_postfix=str(_i))
-                         for _i, item in enumerate(read_confusion_data(dir_path))]
-    rst_items += flatten(confusion_samples)
+    # confusion_samples = [proc_confusion_item(item, id_prefix='cf', id_postfix=str(_i))
+    #                      for _i, item in enumerate(read_confusion_data(dir_path))]
+    # rst_items += flatten(confusion_samples)
 
     # generate samples from pre-processed samples (*_cd.json).
     ignore_files = []  # ['15test_cd.json']
@@ -269,10 +269,12 @@ def preproc_cd():
         rst_items += custom_samples
 
     # Split into train dataset and valid dataset.
-    train_items, dev_items = random_split(rst_items, [9, 1],
+    n_dev = len(rst_items) // 10
+    n_trn = len(rst_items) - n_dev
+    train_items, dev_items = random_split(rst_items, [n_trn, n_dev],  # absolute size of samples
                                           generator=torch.Generator().manual_seed(666))
-    print(f"Dump {len(train_items) * 9} samples as train and {len(dev_items)} samples as dev.")
-    dump_json(dev_items, get_abs_path('datasets', 'csc', 'dev.json'))
-    dump_json(train_items, get_abs_path('datasets', 'csc', 'train.json'))
-    dump_json(test_items, get_abs_path('datasets', 'csc', 'test.json'))
+    print(f"Dump {n_trn} samples as train and {n_dev} samples as dev.")
+    dump_json(list(test_items), get_abs_path('datasets', 'csc', 'test.json'))
+    dump_json(list(dev_items), get_abs_path('datasets', 'csc', 'dev.json'))
+    dump_json(list(train_items), get_abs_path('datasets', 'csc', 'train.json'))
     gc.collect()

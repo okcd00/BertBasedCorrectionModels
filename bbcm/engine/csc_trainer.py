@@ -84,10 +84,12 @@ class CscTrainingModel(BaseTrainingEngine):
         loss = np.mean([out[0] for out in outputs])
         self.log('val_loss', loss)
         self._logger.info(f'loss: {loss}')
-        det_acc = np.mean(det_acc_labels)
+        det_acc = np.array(det_acc_labels).reshape(-1).mean()
+        # print(det_acc)
         self._logger.info(f'Detection:\n'
                           f'acc: {det_acc:.4f}')
-        cor_acc = np.mean(cor_acc_labels)
+        cor_acc = np.array(cor_acc_labels).reshape(-1).mean()
+        # print(cor_acc)
         self._logger.info(f'Correction:\n'
                           f'acc: {cor_acc:.4f}')
         det_f1, cor_f1 = compute_corrector_prf(results, self._logger, on_detected=True)
@@ -97,9 +99,9 @@ class CscTrainingModel(BaseTrainingEngine):
     def test_step(self, batch, batch_idx):
         return self.validation_step(batch, batch_idx)
 
-    def test_epoch_end(self, outputs) -> None:
+    def test_epoch_end(self, outputs):
         self._logger.info('\nTest.\n')
-        self.validation_epoch_end(outputs)
+        return self.validation_epoch_end(outputs)
 
     def evaluate_from_loader(self, loader):
         outputs = []

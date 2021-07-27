@@ -14,9 +14,9 @@ def report_prf(tp, fp, fn, phase, logger):
         f1_score = 0
     else:
         f1_score = 2 * (precision * recall) / (precision + recall)
-    logger.info(f"The {phase} result is:\n")
-    logger.info(f"precision={precision}, recall={recall} and F1={f1_score}\n")
-    logger.info(f"support: TP={tp}, FP={fp}, FN={fn}\n")
+    logger.info(f"The {phase} result is:")
+    logger.info(f"\nprecision={precision}, recall={recall} and F1={f1_score}")
+    logger.info(f"support: TP={tp}, FP={fp}, FN={fn}")
     return precision, recall, f1_score
 
 
