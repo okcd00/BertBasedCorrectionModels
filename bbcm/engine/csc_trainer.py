@@ -8,6 +8,7 @@ import torch
 import operator
 import numpy as np
 from transformers import BertTokenizer
+from bbcm.utils import flatten
 from bbcm.utils.evaluations import compute_corrector_prf, compute_sentence_level_prf
 from .bases import BaseTrainingEngine
 
@@ -78,17 +79,17 @@ class CscTrainingModel(BaseTrainingEngine):
 
         # loss, det_acc_labels, cor_acc_labels, results
         for out in outputs:
-            det_acc_labels += out[1]
-            cor_acc_labels += out[2]
+            det_acc_labels += flatten(out[1])
+            cor_acc_labels += flatten(out[2])
             results += out[3]
         loss = np.mean([out[0] for out in outputs])
         self.log('val_loss', loss)
         self._logger.info(f'loss: {loss}')
-        det_acc = np.array(det_acc_labels).reshape(-1).mean()
+        det_acc = np.array(det_acc_labels).mean()
         # print(det_acc)
         self._logger.info(f'Detection:\n'
                           f'acc: {det_acc:.4f}')
-        cor_acc = np.array(cor_acc_labels).reshape(-1).mean()
+        cor_acc = np.array(cor_acc_labels).mean()
         # print(cor_acc)
         self._logger.info(f'Correction:\n'
                           f'acc: {cor_acc:.4f}')
