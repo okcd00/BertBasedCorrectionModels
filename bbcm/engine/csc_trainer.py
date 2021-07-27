@@ -51,7 +51,7 @@ class CscTrainingModel(BaseTrainingEngine):
             _src = self.tokenizer(src, add_special_tokens=False)['input_ids']
             _tgt = tgt[1:len(_src) + 1].cpu().numpy().tolist()
             _predict = predict[1:len(_src) + 1].cpu().numpy().tolist()
-            cor_acc_labels.append((_tgt.eq(_predict)).float())
+            cor_acc_labels.append([float(_t == _p) for _t, _p in zip(_tgt, _predict)])
             # counts for correctly-detected tokens only
             # det_acc_labels.append(det_predict[1:len(_src) + 1].equal(det_label[1:len(_src) + 1]))
             pred_det = det_predict[1:len(_src) + 1]
