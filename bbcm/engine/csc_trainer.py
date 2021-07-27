@@ -95,6 +95,10 @@ class CscTrainingModel(BaseTrainingEngine):
                           f'acc: {cor_acc:.4f}')
         det_f1, cor_f1 = compute_corrector_prf(results, self._logger, on_detected=True)
         compute_sentence_level_prf(results, self._logger)
+        self.log_dict({
+            'det_f1': det_f1,
+            'cor_f1': cor_f1,
+        }, logger=True)
         return det_acc, cor_acc, det_f1, cor_f1
 
     def test_step(self, batch, batch_idx):
