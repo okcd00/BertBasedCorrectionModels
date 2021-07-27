@@ -31,11 +31,14 @@ def get_dynamic_loader(cfg, get_loader_fn=None, **kwargs):
     path = get_abs_path(cfg.DATASETS.TRAIN)
     if get_loader_fn is None:
         get_loader_fn = get_csc_loader
+
+    from transformers import BertTokenizer
+    tokenizer = BertTokenizer.from_pretrained(cfg.MODEL.BERT_CKPT)
     loader = get_loader_fn(path,
                            batch_size=cfg.SOLVER.BATCH_SIZE,
                            shuffle=True,
                            num_workers=cfg.DATALOADER.NUM_WORKERS,
-                           _collate_fn=DynamicDataCollatorForCsc,  # <= HERE
+                           _collate_fn=DynamicDataCollatorForCsc(tokenizer),  # <= HERE
                            **kwargs)
     return loader
 
@@ -51,7 +54,6 @@ def make_loaders(cfg, get_loader_fn=None, **kwargs):
                                      batch_size=cfg.SOLVER.BATCH_SIZE,
                                      shuffle=True,
                                      num_workers=cfg.DATALOADER.NUM_WORKERS,
-                                     # _collate_fn=_collate_fn,
                                      **kwargs)
     if cfg.DATASETS.VALID == '':
         valid_loader = None
@@ -60,7 +62,6 @@ def make_loaders(cfg, get_loader_fn=None, **kwargs):
                                      batch_size=cfg.TEST.BATCH_SIZE,
                                      shuffle=False,
                                      num_workers=cfg.DATALOADER.NUM_WORKERS,
-                                     # _collate_fn=_collate_fn,
                                      **kwargs)
     if cfg.DATASETS.TEST == '':
         test_loader = None
@@ -69,6 +70,5 @@ def make_loaders(cfg, get_loader_fn=None, **kwargs):
                                     batch_size=cfg.TEST.BATCH_SIZE,
                                     shuffle=False,
                                     num_workers=cfg.DATALOADER.NUM_WORKERS,
-                                    # _collate_fn=_collate_fn,
                                     **kwargs)
     return train_loader, valid_loader, test_loader
