@@ -14,6 +14,7 @@ def get_train_loader(cfg, get_loader_fn=None, ep=0, **kwargs):
     # single function for changing from different datasets.
     if ep > 0:
         path = get_abs_path(cfg.DATASETS.TRAIN) + f".ep{ep}"
+        print(f"Now loading dataset from path: {path}")
     else:
         path = get_abs_path(cfg.DATASETS.TRAIN)
     if get_loader_fn is None:
@@ -22,7 +23,6 @@ def get_train_loader(cfg, get_loader_fn=None, ep=0, **kwargs):
                                  batch_size=cfg.SOLVER.BATCH_SIZE,
                                  shuffle=True,
                                  num_workers=cfg.DATALOADER.NUM_WORKERS,
-                                 # _collate_fn=_collate_fn,
                                  **kwargs)
     return train_loader
 

@@ -4,10 +4,10 @@
 @Author :   Abtion
 @Email  :   abtion{at}outlook.com
 """
-import argparse
 import os
-
+import copy
 import logging
+import argparse
 
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -16,7 +16,6 @@ from bbcm.utils import get_abs_path
 from bbcm.utils.logger import setup_logger
 from bbcm.config import cfg
 import pytorch_lightning as pl
-import os
 
 
 def args_parse(config_file=''):
@@ -134,7 +133,7 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
                 train_loader = get_train_loader(
                     cfg=config, ep=epoch+1, _collate_fn=_collate_fn)
             res = trainer.test(model, train_loader)
-            logs[epoch].append(res)
+            logs[epoch].append(copy.deepcopy(res))
 
         if 'test' in config.MODE and test_loader and len(test_loader) > 0:
             if ckpt_callback and len(ckpt_callback.best_model_path) > 0:
@@ -147,7 +146,7 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
             # if (ckpt_path is not None) and os.path.exists(ckpt_path):
             #     model.load_state_dict(torch.load(ckpt_path)['state_dict'])
             res = trainer.test(model, test_loader)
-            logs[epoch].append(res)
+            logs[epoch].append(copy.deepcopy(res))
 
     from pprint import pprint
     pprint(logs)
