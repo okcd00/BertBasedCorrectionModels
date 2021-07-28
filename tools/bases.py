@@ -12,7 +12,7 @@ import argparse
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from bbcm.utils import get_abs_path
+from bbcm.utils import get_abs_path, dump_json
 from bbcm.utils.logger import setup_logger
 from bbcm.config import cfg
 import pytorch_lightning as pl
@@ -131,7 +131,7 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
             print(f"\n=====Test on {ep}-th epoch=====\n")
             if ep != epoch:  # test on current epoch.
                 train_loader = get_train_loader(
-                    cfg=config, ep=epoch+1, _collate_fn=_collate_fn)
+                    cfg=config, ep=ep+1, _collate_fn=_collate_fn)
             res = trainer.test(model, train_loader)
             logs[epoch].append(copy.deepcopy(res))
 
@@ -150,3 +150,4 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
 
     from pprint import pprint
     pprint(logs)
+    dump_json(logs, get_abs_path(config.OUTPUT_DIR, 'dynamic_training.log'))
