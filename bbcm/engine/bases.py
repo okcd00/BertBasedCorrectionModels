@@ -23,7 +23,7 @@ class BaseTrainingEngine(pl.LightningModule):
         return [optimizer], [scheduler]
 
     def on_validation_epoch_start(self) -> None:
-        self._logger.info('Valid.')
+        self._logger.info('\n=====Valid=====\n')
 
     def on_test_epoch_start(self) -> None:
-        self._logger.info('Testing...')
+        self._logger.info('\n=====Testing=====\n')

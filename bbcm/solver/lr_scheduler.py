@@ -70,7 +70,7 @@ class WarmupExponentialLR(_LRScheduler):
         self.warmup_method = 'linear'
         self.warmup_epochs = warmup_epochs
         self.warmup_factor = warmup_factor
-        super().__init__(optimizer, last_epoch, verbose)
+        super().__init__(optimizer, last_epoch)
 
     def get_lr(self):
         if not self._get_lr_called_within_step:
