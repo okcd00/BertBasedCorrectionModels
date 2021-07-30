@@ -51,7 +51,7 @@ def main():
     train(cfg, model, loaders, ckpt_callback)
 
 
-def dynamic_main():
+def dynamic_main(fixed=False):
     cfg = args_parse("csc/train_bert4csc.yml")
 
     # 如果不存在训练文件则先处理数据
@@ -75,10 +75,10 @@ def dynamic_main():
         monitor=None,
         dirpath=get_abs_path(cfg.OUTPUT_DIR),
         filename='{epoch:02d}_{val_loss:.5f}',
-        save_top_k=1,
+        save_top_k=-1,
     )
-    dynamic_train(cfg, model, loaders, ckpt_callback)
+    dynamic_train(cfg, model, loaders, ckpt_callback, fixed=fixed)
 
 
 if __name__ == '__main__':
-    main()
+    dynamic_main(fixed=False)

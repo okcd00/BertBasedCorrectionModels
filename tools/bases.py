@@ -91,7 +91,7 @@ def train(config, model, loaders, ckpt_callback=None):
         trainer.test(model, test_loader)
 
 
-def dynamic_train(config, model, loaders, ckpt_callback=None):
+def dynamic_train(config, model, loaders, ckpt_callback=None, fixed=False):
     """
     训练
     Args:
@@ -112,13 +112,20 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
     _collate_fn = DataCollatorForCsc(tokenizer=tokenizer)
 
     from bbcm.data.build import get_train_loader
+
+    if fixed:  # always the first epoch.
+        train_loader = get_train_loader(
+            cfg=config, ep=1, _collate_fn=_collate_fn)
+
     for epoch in range(config.SOLVER.MAX_EPOCHS):
         trainer = pl.Trainer(max_epochs=1,  # train one single epoch
                              gpus=None if config.MODEL.DEVICE == 'cpu' else config.MODEL.GPU_IDS,
                              accumulate_grad_batches=config.SOLVER.ACCUMULATE_GRAD_BATCHES,
                              callbacks=[ckpt_callback])
-        train_loader = get_train_loader(
-            cfg=config, ep=epoch+1, _collate_fn=_collate_fn)
+        if not fixed:
+            train_loader = get_train_loader(
+                cfg=config, ep=epoch + 1,
+                _collate_fn=_collate_fn)
         if 'train' in config.MODE and train_loader and len(train_loader) > 0:
             if valid_loader and len(valid_loader) > 0:
                 trainer.fit(model, train_loader, valid_loader)
@@ -127,7 +134,8 @@ def dynamic_train(config, model, loaders, ckpt_callback=None):
 
         # test on train set.
         logs[epoch] = []
-        for ep in range(epoch, -1, -1):
+        # for ep in range(epoch, -1, -1):
+        for ep in range(config.SOLVER.MAX_EPOCHS):  # test for all
             print(f"\n=====Test on {ep}-th epoch=====\n")
             if ep != epoch:  # test on current epoch.
                 train_loader = get_train_loader(

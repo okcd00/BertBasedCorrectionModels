@@ -82,36 +82,43 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
             ot, wr_ids = deepcopy(o), deepcopy(w)
             if random_pos:  # change another position to augment
                 ot, wr_ids = self.random_wrong_ids(ct=c, wrong_id=wr_ids)
-            for wid in w:
+            current_wids = []
+            for wid in wr_ids:
                 cw = self.change_words(
                     word=o[wid], correct_word=c[wid], sentence=c)
                 # change ori_text here
                 ot = f"{ot[:wid]}{cw}{ot[wid+1:]}"
-                wr_ids.append(wid)
+                if cw != c[wid]:
+                    current_wids.append(wid)
             ori_text_case.append(ot)
-            wrong_ids_case.append(wr_ids)
+            wrong_ids_case.append(current_wids)
         return ori_text_case, cor_text_case, wrong_ids_case
 
     def samples(self):
         return [sample for s_idx, sample in enumerate(self)]
 
-    def generate_csc_augmented_samples(self, csc_data_path):
+    def generate_csc_augmented_samples(self, csc_data_path, random_pos=True):
         import json
         csc_origin_data = json.load(open(csc_data_path, 'r'))
         augmented_samples = []
         for sample in csc_origin_data:
             w = sample['wrong_ids']
-            o, c = sample['original_text'], sample['correct_text']
+            c = sample['correct_text']
+            o = sample['original_text']
             ot, wr_ids = deepcopy(o), deepcopy(w)
-            for wid in w:
+            if random_pos:  # change another position to augment
+                ot, wr_ids = self.random_wrong_ids(ct=c, wrong_id=wr_ids)
+            current_wids = []
+            for wid in wr_ids:
                 cw = self.change_words(
                     word=o[wid], correct_word=c[wid], sentence=c)
                 ot = f"{ot[:wid]}{cw}{ot[wid+1:]}"
-                wr_ids.append(wid)
+                if cw != c[wid]:
+                    current_wids.append(wid)
             augmented_samples.append({
                 'id': sample['id'],
                 'original_text': ot,
-                'wrong_ids': sample['wrong_ids'],
+                'wrong_ids': current_wids,
                 'correct_text': c,
             })
         return augmented_samples

@@ -12,6 +12,7 @@ from bbcm.utils import load_json
 class CscDataset(Dataset):
     def __init__(self, fp):
         self.data = load_json(fp)
+        print(f"Loaded {self.data.__len__()} samples from {fp}.")
 
     def __len__(self):
         return len(self.data)
