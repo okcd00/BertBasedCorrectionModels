@@ -67,14 +67,25 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
         # TODO: modify words with word_confusion_set
         return word
 
-    def sample_augment(self, ori_text, cor_text, wrong_ids):
-        # change ori_text here
+    @staticmethod
+    def random_wrong_ids(ct, wrong_id):
+        ot = deepcopy(ct)
+        text_len = ot.__len__()
+        n_faulty_position = len(wrong_id)
+        wrong_ids = sorted(random.sample(range(text_len), max(1, n_faulty_position)))
+        return ot, wrong_ids
+
+    def sample_augment(self, ori_text, cor_text, wrong_ids, random_pos=True):
         ori_text_case, cor_text_case, wrong_ids_case = [], cor_text, []
+        # ori_text, cor_text, wrong_ids are all lists
         for o, c, w in zip(ori_text, cor_text, wrong_ids):
             ot, wr_ids = deepcopy(o), deepcopy(w)
+            if random_pos:  # change another position to augment
+                ot, wr_ids = self.random_wrong_ids(ct=c, wrong_id=wr_ids)
             for wid in w:
                 cw = self.change_words(
                     word=o[wid], correct_word=c[wid], sentence=c)
+                # change ori_text here
                 ot = f"{ot[:wid]}{cw}{ot[wid+1:]}"
                 wr_ids.append(wid)
             ori_text_case.append(ot)
