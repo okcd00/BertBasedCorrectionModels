@@ -64,8 +64,8 @@ def compute_corrector_prf(results, logger, on_detected=True):
         all_predict_true_index.append(each_true_index)
 
     # For the detection Precision, Recall and F1
-    _, _, detection_f1 = report_prf(TP, FP, FN,
-                                    'detection', logger=logger)
+    dp, dr, detection_f1 = report_prf(TP, FP, FN,
+                                      'detection', logger=logger)
 
     # store FN counts
     n_misreported = int(FN)
@@ -92,14 +92,26 @@ def compute_corrector_prf(results, logger, on_detected=True):
                     FN += 1
 
     # For the correction Precision, Recall and F1
-    _, _, correction_f1 = report_prf(TP, FP, FN,
-                                     'correction', logger=logger)
+    cp, cr, correction_f1 = report_prf(TP, FP, FN,
+                                       'correction', logger=logger)
     # common metrics to compare with other baseline methods.
-    _, _, correction_cf1 = report_prf(TP, FP, FN + n_misreported,
-                                      'correction_common', logger=logger)
+    ccp, ccr, correction_cf1 = report_prf(TP, FP, FN + n_misreported,
+                                          'correction_common', logger=logger)
     if not on_detected:
         correction_f1 = correction_cf1
-    return detection_f1, correction_f1
+
+    details = {
+        'det_p': dp,
+        'det_r': dr,
+        'det_f1': detection_f1,
+        'cor_p': cp,
+        'cor_r': cr,
+        'cor_f1': correction_f1,
+        'common_cor_p': ccp,
+        'common_cor_r': ccr,
+        'common_cor_f1': correction_cf1,
+    }
+    return detection_f1, correction_f1, details
 
 
 def compute_sentence_level_prf(results, logger):

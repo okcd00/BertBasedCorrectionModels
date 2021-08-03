@@ -81,4 +81,4 @@ def dynamic_main(fixed=False):
 
 
 if __name__ == '__main__':
-    dynamic_main(fixed=False)
+    dynamic_main(fixed=True)

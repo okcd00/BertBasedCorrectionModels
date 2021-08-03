@@ -132,14 +132,13 @@ def dynamic_train(config, model, loaders, ckpt_callback=None, fixed=False):
             else:
                 trainer.fit(model, train_loader)
 
-        # test on train set.
         logs[epoch] = []
         # for ep in range(epoch, -1, -1):
         for ep in range(1, config.SOLVER.MAX_EPOCHS + 1):  # test for all
             print(f"\n=====Test on {ep}-th epoch=====\n")
-            train_loader = get_train_loader(
+            t_loader = get_train_loader(  # test on train set
                 cfg=config, ep=ep, _collate_fn=_collate_fn)
-            res = trainer.test(model, train_loader)
+            res = trainer.test(model, t_loader)
             logs[epoch].append(copy.deepcopy(res))
 
         if 'test' in config.MODE and test_loader and len(test_loader) > 0:
