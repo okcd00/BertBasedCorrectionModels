@@ -16,9 +16,10 @@ from bbcm.utils.confuser_utils import (
 )
 
 
-SCORE_MAT_PATH = './data/tencent_embedding/score_data/'
-EMBEDDING_PATH = './data/tencent_embedding/sound_tokens/'
-CORPUS_PATH = './data/tencent_embedding/pinyin2token.pkl'
+CONFUSOR_DATA_DIR = '/data/chendian/'  # './data'
+SCORE_MAT_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/score_data/'
+EMBEDDING_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/sound_tokens/'
+CORPUS_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/pinyin2token.pkl'
 
 
 class Confusor(object):
