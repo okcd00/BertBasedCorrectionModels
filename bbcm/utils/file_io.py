@@ -11,16 +11,8 @@ import os
 import shutil
 import sys
 from collections import OrderedDict
-from typing import (
-    IO,
-    Any,
-    Callable,
-    Dict,
-    List,
-    MutableMapping,
-    Optional,
-    Union,
-)
+from typing import (IO, Any, Callable, Dict, List, MutableMapping, Optional,
+                    Union)
 
 __all__ = ["PathManager",
            "get_cache_dir",

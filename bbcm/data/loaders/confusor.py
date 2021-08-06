@@ -20,6 +20,7 @@ CONFUSOR_DATA_DIR = '/data/chendian/'  # './data'
 SCORE_MAT_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/score_data/'
 EMBEDDING_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/sound_tokens/'
 CORPUS_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/pinyin2token.pkl'
+SIGHAN_CFS_PATH = '/home/chendian/BBCM/datasets/sighan_confusion.txt'
 
 
 class Confusor(object):
@@ -59,8 +60,7 @@ class Confusor(object):
         self.score_matrix = self.load_score_matrix()
 
     def load_sighan_confusion_set(self):
-        sighan_cf_path = '/home/chendian/BBCM/datasets/sighan_confusion.txt'  # on C14
-        for line in open(sighan_cf_path, 'r'):
+        for line in open(SIGHAN_CFS_PATH, 'r'):
             key, val = line.strip().split(':')
             self.char_confusion_set.setdefault(key, [])
             self.char_confusion_set[key].extend([c for c in val])

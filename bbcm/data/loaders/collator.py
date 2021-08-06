@@ -1,7 +1,9 @@
-import torch
 import random
 from copy import deepcopy
+
+import torch
 from bbcm.data.loaders.confusor import Confusor
+from bbcm.utils.text_utils import is_chinese_char
 
 
 class DataCollatorForCsc:
@@ -25,8 +27,8 @@ class DataCollatorForCsc:
                         margins.append(len(word) - 1)
                 margin = sum(margins)
                 move = 0
-                while (abs(move) < margin) or (idx + move >= len(encoded_text)) or encoded_text[idx + move].startswith(
-                        '##'):
+                while (abs(move) < margin) or (idx + move >= len(encoded_text)) \
+                        or encoded_text[idx + move].startswith('##'):
                     move -= 1
                 det_labels[i, idx + move + 1] = 1
         return ori_texts, cor_texts, det_labels
@@ -35,7 +37,7 @@ class DataCollatorForCsc:
 class DynamicDataCollatorForCsc(DataCollatorForCsc):
     def __init__(self, tokenizer, augmentation=False):
         super(DynamicDataCollatorForCsc, self).__init__(tokenizer)
-        self.first_epoch = True
+        self.first_epoch = True  # False 
         self.augmentation = augmentation
         self.confusor = Confusor()
 
@@ -53,8 +55,9 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
     def random_wrong_ids(ct, wrong_id):
         ot = deepcopy(ct)
         text_len = ot.__len__()
+        candidate_position = [i for i in range(text_len) if is_chinese_char(ct[i])]
         n_faulty_position = len(wrong_id)
-        wrong_ids = sorted(random.sample(range(text_len), max(1, n_faulty_position)))
+        wrong_ids = sorted(random.sample(candidate_position, max(1, n_faulty_position)))
         return ot, wrong_ids
 
     def sample_augment(self, ori_text, cor_text, wrong_ids, random_pos=True):

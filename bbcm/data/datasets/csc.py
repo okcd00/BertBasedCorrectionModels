@@ -13,7 +13,6 @@ from glob import glob
 class CscDataset(Dataset):
     def __init__(self, fp):
         self.data = load_json(fp)
-        print(f"Loaded {self.data.__len__()} samples from {fp}.")
 
     def __len__(self):
         return len(self.data)
@@ -28,11 +27,13 @@ class PureTextDataset(Dataset):
         self.file_sample_count = []
         self.file_offset = [0]
         self.sample_counts = self.count_samples()
+        self.current_file_index = 0
+        self.current_file_samples = []
         print(f"Loaded {self.file_list.__len__()} files from {fp}.")
 
     @staticmethod
     def read_text_file(path):
-        return [line.strip() for line in open(path, 'r')]
+        return [line.strip() for line in open(path, 'r') if line.strip()]
 
     def count_samples(self):
         for file_name in self.file_list:
@@ -62,8 +63,10 @@ class PureTextDataset(Dataset):
         file_index = self.binary_search_right(self.file_offset, index) - 1
         if file_index == self.file_list.__len__():
             raise ValueError(f"Invalid index {file_index} with offset {index}")
-        file_path = self.file_list[file_index]
-        samples = self.read_text_file(file_path)
-        target_text = samples[index-self.file_offset[file_index]]
+        if file_index != self.current_file_index:
+            file_path = self.file_list[file_index]
+            self.current_file_samples = self.read_text_file(file_path)
+            self.current_file_index = file_index
+        target_text = self.current_file_samples[index-self.file_offset[file_index]]
         # return self.data[index]['original_text'], self.data[index]['correct_text'], self.data[index]['wrong_ids']
         return target_text, target_text, []

@@ -53,6 +53,7 @@ def main():
 
 def dynamic_main(fixed=False):
     cfg = args_parse("csc/train_bert4csc.yml")
+    fixed = cfg.TASK.get('FIXED', False)
 
     # 如果不存在训练文件则先处理数据
     # if not os.path.exists(get_abs_path(cfg.DATASETS.TRAIN)):
@@ -81,4 +82,4 @@ def dynamic_main(fixed=False):
 
 
 if __name__ == '__main__':
-    dynamic_main(fixed=True)
+    dynamic_main()

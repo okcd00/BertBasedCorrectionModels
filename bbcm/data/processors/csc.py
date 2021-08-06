@@ -255,16 +255,16 @@ def preproc_cd():
     dir_path = get_abs_path('datasets', 'csc')
 
     # generate test samples from ys_data or SIGHAN-15Test.
-    test_file_path = get_abs_path(dir_path, 'ys_test.json')  # '15test_cd.json'
+    test_file_path = get_abs_path(dir_path, '15test_cd.json')  # '15test_cd.json'
     test_items = load_json(test_file_path)
 
     # generate samples from AutoCorpusGeneration dataset (train.sgml).
-    # confusion_samples = [proc_confusion_item(item, id_prefix='cf', id_postfix=str(_i))
-    #                      for _i, item in enumerate(read_confusion_data(dir_path))]
-    # rst_items += flatten(confusion_samples)
+    confusion_samples = [proc_confusion_item(item, id_prefix='cf', id_postfix=str(_i))
+                         for _i, item in enumerate(read_confusion_data(dir_path))]
+    rst_items += flatten(confusion_samples)
 
     # generate samples from pre-processed samples (*_cd.json).
-    ignore_files = []  # ['15test_cd.json']
+    ignore_files = ['15test_cd.json']
     for custom_samples in read_cd_data(dir_path, ignore_files=ignore_files):
         rst_items += custom_samples
 

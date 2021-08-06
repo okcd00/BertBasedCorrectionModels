@@ -1,5 +1,6 @@
 .idea
 .DS_Store
+.vscode/
 __pycache__
 lightning_logs
 
@@ -17,7 +18,7 @@ env/
 build/
 develop-eggs/
 dist/
-datasets/
+/datasets/
 downloads/
 eggs/
 .eggs/

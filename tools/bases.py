@@ -36,7 +36,6 @@ def args_parse(config_file=''):
     cfg.freeze()
 
     name = cfg.MODEL.NAME
-
     output_dir = cfg.OUTPUT_DIR
 
     logger = setup_logger(name, get_abs_path(output_dir), 0)
