@@ -17,6 +17,7 @@ env/
 build/
 develop-eggs/
 dist/
+datasets/
 downloads/
 eggs/
 .eggs/
@@ -29,6 +30,8 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.pyc
+*.cpython-37.pyc
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
