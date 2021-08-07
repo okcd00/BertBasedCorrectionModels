@@ -5,7 +5,7 @@
 @Email  :   abtion{at}outlook.com
 """
 from torch.utils.data import Dataset
-from bbcm.utils import load_json, dump_json, binary_search_right
+from bbcm.utils import load_json, dump_json, lower_bound
 from glob import glob
 
 import os
@@ -38,12 +38,17 @@ class PureTextDataset(Dataset):
     def read_text_file(path):
         return [line.strip() for line in open(path, 'r') if line.strip()]
 
+    def remove_dataset_info(self):
+        fp_log_path = f"{self.fp}/dataset_info.log"
+        if os.path.exists(fp_log_path):
+            os.remove(fp_log_path)
+
     def count_samples(self):
         fp_log_path = f"{self.fp}/dataset_info.log"
         start_time = time.time()
         if os.path.exists(fp_log_path):
             dataset_info = load_json(fp_log_path)
-            self.file_offset = dataset_info['file_offset']
+            self.file_offset = list(map(int, dataset_info['file_offset']))
             self.file_sample_count = dataset_info['file_sample_count']
             self.sample_counts = dataset_info['sample_counts']
         else:
@@ -65,16 +70,16 @@ class PureTextDataset(Dataset):
         self.__init__(dir_path)
 
     @staticmethod
-    def binary_search_right(a, x):
-        # binary_search_for_file_index
-        return binary_search_right(a, x)
+    def binary_search_file_index(a, x):
+        # the index of the file for x-th sample.
+        return lower_bound(a, x + 1) - 1
 
     def __len__(self):
         return self.sample_counts
 
     def __getitem__(self, index):
         # for a large text corpus, shuffle is not recommended.
-        file_index = self.binary_search_right(self.file_offset, index) - 1
+        file_index = self.binary_search_file_index(self.file_offset, index) - 1
         if file_index == self.file_list.__len__():
             raise ValueError(f"Invalid index {file_index} with offset {index}")
         if file_index != self.current_file_index:
