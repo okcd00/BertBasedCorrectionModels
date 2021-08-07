@@ -5,9 +5,11 @@
 @Email  :   abtion{at}outlook.com
 """
 from torch.utils.data import Dataset
-from bbcm.utils import load_json
-from bisect import bisect_left, bisect_right
+from bbcm.utils import load_json, dump_json, binary_search_right
 from glob import glob
+
+import os
+import time
 
 
 class CscDataset(Dataset):
@@ -23,6 +25,7 @@ class CscDataset(Dataset):
 
 class PureTextDataset(Dataset):
     def __init__(self, fp):
+        self.fp = fp
         self.file_list = sorted(glob(f"{fp}/*.txt"))
         self.file_sample_count = []
         self.file_offset = [0]
@@ -36,12 +39,27 @@ class PureTextDataset(Dataset):
         return [line.strip() for line in open(path, 'r') if line.strip()]
 
     def count_samples(self):
-        for file_name in self.file_list:
-            samples = self.read_text_file(file_name)
-            s_len = len(samples)
-            self.file_sample_count.append(s_len)
-            self.file_offset.append(self.file_offset[-1] + s_len)
-        return sum(self.file_sample_count)
+        fp_log_path = f"{self.fp}/dataset_info.log"
+        start_time = time.time()
+        if os.path.exists(fp_log_path):
+            dataset_info = load_json(fp_log_path)
+            self.file_offset = dataset_info['file_offset']
+            self.file_sample_count = dataset_info['file_sample_count']
+            self.sample_counts = dataset_info['sample_counts']
+        else:
+            for file_name in self.file_list:
+                samples = self.read_text_file(file_name)
+                s_len = len(samples)
+                self.file_sample_count.append(s_len)
+                self.file_offset.append(self.file_offset[-1] + s_len)
+            self.sample_counts = sum(self.file_sample_count)
+            dump_json({
+                'file_offset': self.file_offset,
+                'file_sample_count': self.file_sample_count,
+                'sample_counts': self.sample_counts,
+            }, fp_log_path)
+        print(f"Init indexing ends in {time.time()-start_time} seconds")
+        return self.sample_counts
 
     def load_from_dir(self, dir_path):
         self.__init__(dir_path)
@@ -49,11 +67,7 @@ class PureTextDataset(Dataset):
     @staticmethod
     def binary_search_right(a, x):
         # binary_search_for_file_index
-        i = bisect_left(a, x)
-        if i:
-            return i
-        else:
-            return 0
+        return binary_search_right(a, x)
 
     def __len__(self):
         return self.sample_counts

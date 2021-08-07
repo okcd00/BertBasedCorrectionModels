@@ -4,22 +4,16 @@
 @Author :   Abtion
 @Email  :   abtion{at}outlook.com
 """
-import errno
-import json
-import logging
 import os
-import shutil
 import sys
+import json
+import errno
+import shutil
+import logging
 from collections import OrderedDict
-from typing import (IO, Any, Callable, Dict, List, MutableMapping, Optional,
-                    Union)
-
-__all__ = ["PathManager",
-           "get_cache_dir",
-           "get_abs_path",
-           "dump_json",
-           "load_json",
-           "flatten"]
+from typing import (
+    IO, Any, Callable, Dict, List, 
+    MutableMapping, Optional, Union)
 
 
 def get_cache_dir(cache_dir: Optional[str] = None) -> str:

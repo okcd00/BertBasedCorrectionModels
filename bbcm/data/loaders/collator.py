@@ -39,42 +39,71 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
         super(DynamicDataCollatorForCsc, self).__init__(tokenizer)
         self.first_epoch = True  # False 
         self.augmentation = augmentation
-        self.confusor = Confusor()
+        self.confusor = Confusor(cand_pinyin_num=10)
 
     def change_words(self, word, correct_word=None, sentence=None):
         if len(word) == 1:
-            candidates = self.confusor.char_confusion_set.get(word, [])
-            can = deepcopy(candidates)
-            if correct_word and correct_word in can:
-                can.remove(correct_word)
-            return random.choice(can) if can else word
-        # TODO: modify words with word_confusion_set
+            candidates = self.confusor(word)
+            candidates += self.confusor.char_confusion_set.get(word, [])
+            # can = deepcopy(candidates)
+            return random.choice(candidates) if candidates else word
+        else:
+            candidates = self.confusor(word)
+        if correct_word and correct_word in candidates:
+            candidates.remove(correct_word)
         return word
 
-    @staticmethod
-    def random_wrong_ids(ct, wrong_id):
+    def random_wrong_ids(self, ct, wrong_id, word_offsets=None):
         ot = deepcopy(ct)
         text_len = ot.__len__()
         candidate_position = [i for i in range(text_len) if is_chinese_char(ct[i])]
         n_faulty_position = len(wrong_id)
-        wrong_ids = sorted(random.sample(candidate_position, max(1, n_faulty_position)))
-        return ot, wrong_ids
+        wrong_ids = sorted(random.sample(candidate_position,
+                                         max(1, n_faulty_position)))
+        if word_offsets:
+            wrong_ids = set(wrong_ids)
+            for wid in wrong_ids:
+                wrong_ids.update(word_offsets[wid])
+        return ot, sorted(wrong_ids)
 
-    def sample_augment(self, ori_text, cor_text, wrong_ids, random_pos=True):
+    def generate_word_offsets(self, ct):
+        word_offsets = {}
+        word_indexes = [0]
+        words = self.confusor.pu.segmentation(ct)
+        for w in words:
+            wc = [_i for _i in range(word_indexes[-1], word_indexes[-1] + len(w))]
+            word_offsets.update({_i: wc for _i in wc})
+            word_indexes.append(len(w) + word_indexes[-1])
+        return word_offsets
+
+    def sample_augment(self, ori_text, cor_text, wrong_ids, random_pos=True, word_level=True):
         ori_text_case, cor_text_case, wrong_ids_case = [], cor_text, []
         # ori_text, cor_text, wrong_ids are all lists
         for o, c, w in zip(ori_text, cor_text, wrong_ids):
             ot, wr_ids = deepcopy(o), deepcopy(w)
+            word_offsets = self.generate_word_offsets(c)
             if random_pos:  # change another position to augment
-                ot, wr_ids = self.random_wrong_ids(ct=c, wrong_id=wr_ids)
-            current_wids = []
+                ot, wr_ids = self.random_wrong_ids(
+                    ct=c, wrong_id=wr_ids, word_offsets=None)
+            done_wid_list = []
             for wid in wr_ids:
-                cw = self.change_words(
-                    word=o[wid], correct_word=c[wid], sentence=c)
+                if wid in done_wid_list:
+                    continue
+                _word = o[wid]
+                _correct_word = c[wid]
+                if word_level and random.random() > 0.5:
+                    word_len = len(word_offsets[wid])
+                    for wid_in_word in word_offsets[wid]:
+                        if wid_in_word in wr_ids:
+                            done_wid_list.append(wid_in_word)
+
+                cw = self.change_words(  # HERE
+                    word=_word, correct_word=_correct_word, sentence=c)
                 # change ori_text here
                 ot = f"{ot[:wid]}{cw}{ot[wid+1:]}"
-                if cw != c[wid]:
-                    current_wids.append(wid)
+                # if cw != c[wid]: current_wids.append(wid)
+            current_wids = [_id for _id in
+                            range(len(c)) if c[_id] != ot[_id]]
             ori_text_case.append(ot)
             wrong_ids_case.append(current_wids)
         return ori_text_case, cor_text_case, wrong_ids_case

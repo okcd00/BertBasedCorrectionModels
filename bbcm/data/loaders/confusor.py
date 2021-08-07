@@ -5,33 +5,42 @@
 @Email  :   okcd00{at}qq.com
 """
 
+import sys
+sys.path.append("../../")
+
 import pickle
 from tqdm import tqdm
+import random
 from bbcm.utils.pinyin_utils import PinyinUtils
 from bbcm.utils.confuser_utils import (
     generate_score_matrix,
     edit_distance_filtering,
     refined_edit_distance,
-    cosine_similarity
+    cosine_similarity,
+    bow_similarity_filtering
 )
 
 
-CONFUSOR_DATA_DIR = '/data/chendian/'  # './data'
+# CONFUSOR_DATA_DIR = '/data/chendian/'
+CONFUSOR_DATA_DIR = '/home/pangchaoxu/'
 SCORE_MAT_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/score_data/'
 EMBEDDING_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/sound_tokens/'
 CORPUS_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/pinyin2token.pkl'
 SIGHAN_CFS_PATH = '/home/chendian/BBCM/datasets/sighan_confusion.txt'
 
 
+
 class Confusor(object):
     def __init__(self, amb_score=0.5, inp_score=0.25, threshold=(0.2, 0.5),
-                 cand_pinyin_num=10, weight=0.5, conf_size=10, mode='sort', debug=False):
+                 cand_pinyin_num=10, weight=0.5, conf_size=10,
+                 filter_strategy='bow', mode='sort', debug=False):
         """
         @param amb_score: [0, 1) score of the ambiguous sounds.
         @param inp_score: [0, 1) score of the input errors.
         @param cand_pinyin_num: the number of candidate pinyin sequences.
         @param threshold: the threshold of the cosine similarity filtering.
-        @param mode: {'sort', 'random'} the 'sort' mode sorts candidates by weighted scores;
+        @param mode: {'sort', 'random'} the 'sort' mode sorts candidates by weighted scores.
+        @param filter_strategy: {'bow', 'ED', 'no'} 'bow' for bow similarity filtering; 'ED' for edit distance filtering.
         @param weight: final_score = -weight * pinyin_score + cosine_similarity.
         @param conf_size: the size of confusion set.
         """
@@ -42,13 +51,15 @@ class Confusor(object):
         self.cand_pinyin_num = cand_pinyin_num
         self.weight = weight
         self.conf_size = conf_size
+        self.filter_strategy = filter_strategy
         self.pu = PinyinUtils()
 
         print("Use {} mode.".format(mode))
+        print("Use {} filtering strategy.".format(filter_strategy))
         self.mode = mode
         self.char_confusion_set = {}
         self.word_confusion_set = {}  # a function is better than a dict
-        # self.load_sighan_confusion_set()
+        self.load_sighan_confusion_set()
         self.load_word_confusion_set()
 
         # pinyin2token corpus
@@ -100,15 +111,23 @@ class Confusor(object):
             amb_data, self.amb_score, inp_data, self.inp_score)
         return self.score_matrix
 
-    def get_pinyin_sequence(self, token, corpus, cand_pinyin_num):
+    def get_pinyin_sequence(self, token, corpus, cand_pinyin_num, filter_strategy):
         """
         @param corpus: a dict {token_len:{pinyin: [tokens]}}
         @return: The top-down pinyin sequences.
         """
         pinyin = ''.join(self.pu.to_pinyin(token))
         cand_py = {}
+        filter_strategy = filter_strategy.lower()
         # print("Edit distance filtering.")
-        filtered_py = edit_distance_filtering(pinyin, list(corpus[str(len(token))].keys()))
+        if filter_strategy == 'ed':
+            filtered_py = edit_distance_filtering(pinyin, list(corpus[str(len(token))].keys()))
+        elif filter_strategy == 'bow':
+            filtered_py = bow_similarity_filtering(pinyin, list(corpus[str(len(token))].keys()))
+        elif filter_strategy == 'no':
+            filtered_py = list(corpus[str(len(token))].keys())
+        else:
+            raise ValueError("invalid filtering strategy: {}".format(filter_strategy))
         # print("Refined edit distance filtering.")
         for pyseq in tqdm(filtered_py):
             score = refined_edit_distance(pinyin, pyseq, self.score_matrix)
@@ -135,7 +154,7 @@ class Confusor(object):
         if self.debug:
             print("{} candidate tokens in total.".format(len(filtered_cand_toks)))
         if mode == 'random':
-            # random.shuffle(filtered_cand_toks)
+            random.shuffle(filtered_cand_toks)
             return filtered_cand_toks[:size]
         elif mode == 'sort':
             cand2score = {}
@@ -150,12 +169,12 @@ class Confusor(object):
             raise ValueError("invalid mode: {}".format(mode))
 
     def __call__(self, word, context=None, word_position=None):
-        cand_pinyin = self.get_pinyin_sequence(word, self.corpus,self.cand_pinyin_num)
+        cand_pinyin = self.get_pinyin_sequence(word, self.corpus, self.cand_pinyin_num, self.filter_strategy)
         confusion_set = self.get_confuse_tokens(word, self.corpus, cand_pinyin, self.threshold, self.mode,
                                                 self.weight, self.conf_size)
         return confusion_set
 
 
 if __name__ == "__main__":
-    conf = Confusor(mode='random')
-    print(conf('其实'))
+    conf = Confusor(threshold=(0.1, 0.5), filter_strategy='bow', mode='sort')
+    print(conf('庞朝旭'))
