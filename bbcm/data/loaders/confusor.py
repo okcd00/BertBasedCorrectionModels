@@ -149,7 +149,7 @@ class Confusor(object):
         filtered_cand_toks = []
         for tok in cand_tokens:
             cos_sim = cosine_similarity(tok2emb[token], tok2emb[tok])
-            if cos_sim >= threshold[0] and cos_sim <= threshold[1]:
+            if threshold[0] <= cos_sim <= threshold[1]:
                 filtered_cand_toks.append(tok)
         if self.debug:
             print("{} candidate tokens in total.".format(len(filtered_cand_toks)))

@@ -76,35 +76,41 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
             word_indexes.append(len(w) + word_indexes[-1])
         return word_offsets
 
+    def sample_augment_single(self, ot, ct, wrong_id, random_pos=True, word_level=True):
+        o_text, c_text, wr_ids = deepcopy(ot), ct, deepcopy(wrong_id)
+        word_offsets = self.generate_word_offsets(c_text)
+        if random_pos:  # change another position to augment
+            o_text, wr_ids = self.random_wrong_ids(
+                ct=c_text, wrong_id=wr_ids, word_offsets=None)
+        done_wid_list = []  # done wid in the same word.
+        for wid in wr_ids:
+            if wid in done_wid_list:
+                continue
+            word_ids = [wid]
+            if word_level and random.random() > 0.5:
+                word_ids = sorted(word_offsets[wid])
+                for wid_in_word in word_ids:
+                    if wid_in_word in wr_ids:
+                        done_wid_list.append(wid_in_word)
+            _word = ''.join([o_text[_i] for _i in word_ids])
+            _correct_word = ''.join([c_text[_i] for _i in word_ids])
+            cw = self.change_words(
+                word=_word, correct_word=_correct_word, sentence=c_text)
+            # change ori_text here
+            o_text = f"{o_text[:word_ids[0]]}{cw}{o_text[word_ids[-1]+1:]}"
+            # if cw != c_text[wid]: current_wids.append(wid)
+        current_wids = [_id for _id in
+                        range(len(c_text)) if c_text[_id] != o_text[_id]]
+        return o_text, c_text, current_wids
+
     def sample_augment(self, ori_text, cor_text, wrong_ids, random_pos=True, word_level=True):
         ori_text_case, cor_text_case, wrong_ids_case = [], cor_text, []
         # ori_text, cor_text, wrong_ids are all lists
-        for o, c, w in zip(ori_text, cor_text, wrong_ids):
-            ot, wr_ids = deepcopy(o), deepcopy(w)
-            word_offsets = self.generate_word_offsets(c)
-            if random_pos:  # change another position to augment
-                ot, wr_ids = self.random_wrong_ids(
-                    ct=c, wrong_id=wr_ids, word_offsets=None)
-            done_wid_list = []
-            for wid in wr_ids:
-                if wid in done_wid_list:
-                    continue
-                _word = o[wid]
-                _correct_word = c[wid]
-                if word_level and random.random() > 0.5:
-                    word_len = len(word_offsets[wid])
-                    for wid_in_word in word_offsets[wid]:
-                        if wid_in_word in wr_ids:
-                            done_wid_list.append(wid_in_word)
-
-                cw = self.change_words(  # HERE
-                    word=_word, correct_word=_correct_word, sentence=c)
-                # change ori_text here
-                ot = f"{ot[:wid]}{cw}{ot[wid+1:]}"
-                # if cw != c[wid]: current_wids.append(wid)
-            current_wids = [_id for _id in
-                            range(len(c)) if c[_id] != ot[_id]]
-            ori_text_case.append(ot)
+        for o, c_text, w in zip(ori_text, cor_text, wrong_ids):
+            o_text, _, current_wids = self.sample_augment_single(
+                ot=o, ct=c_text, wrong_id=w,
+                random_pos=random_pos, word_level=word_level)
+            ori_text_case.append(o_text)
             wrong_ids_case.append(current_wids)
         return ori_text_case, cor_text_case, wrong_ids_case
 
@@ -116,24 +122,16 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
         csc_origin_data = json.load(open(csc_data_path, 'r'))
         augmented_samples = []
         for sample in csc_origin_data:
-            w = sample['wrong_ids']
-            c = sample['correct_text']
             o = sample['original_text']
-            ot, wr_ids = deepcopy(o), deepcopy(w)
-            if random_pos:  # change another position to augment
-                ot, wr_ids = self.random_wrong_ids(ct=c, wrong_id=wr_ids)
-            current_wids = []
-            for wid in wr_ids:
-                cw = self.change_words(
-                    word=o[wid], correct_word=c[wid], sentence=c)
-                ot = f"{ot[:wid]}{cw}{ot[wid+1:]}"
-                if cw != c[wid]:
-                    current_wids.append(wid)
+            c = sample['correct_text']
+            w = sample['wrong_ids']
+            o_text, c_text, current_wids = self.sample_augment_single(
+                ot=o, ct=c, wrong_id=w, random_pos=random_pos)
             augmented_samples.append({
                 'id': sample['id'],
-                'original_text': ot,
+                'original_text': o_text,
                 'wrong_ids': current_wids,
-                'correct_text': c,
+                'correct_text': c_text,
             })
         return augmented_samples
 
