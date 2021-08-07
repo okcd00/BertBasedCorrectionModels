@@ -43,6 +43,14 @@ class PureTextDataset(Dataset):
         if os.path.exists(fp_log_path):
             os.remove(fp_log_path)
 
+    def dump_dataset_info(self):
+        fp_log_path = f"{self.fp}/dataset_info.log"
+        dump_json({
+            'file_offset': self.file_offset,
+            'file_sample_count': self.file_sample_count,
+            'sample_counts': self.sample_counts,
+        }, fp_log_path)
+
     def count_samples(self):
         fp_log_path = f"{self.fp}/dataset_info.log"
         start_time = time.time()
@@ -58,11 +66,7 @@ class PureTextDataset(Dataset):
                 self.file_sample_count.append(s_len)
                 self.file_offset.append(self.file_offset[-1] + s_len)
             self.sample_counts = sum(self.file_sample_count)
-            dump_json({
-                'file_offset': self.file_offset,
-                'file_sample_count': self.file_sample_count,
-                'sample_counts': self.sample_counts,
-            }, fp_log_path)
+            self.dump_dataset_info()
         print(f"Init indexing ends in {time.time()-start_time} seconds")
         return self.sample_counts
 
@@ -79,7 +83,7 @@ class PureTextDataset(Dataset):
 
     def __getitem__(self, index):
         # for a large text corpus, shuffle is not recommended.
-        file_index = self.binary_search_file_index(self.file_offset, index) - 1
+        file_index = self.binary_search_file_index(self.file_offset, index)
         if file_index == self.file_list.__len__():
             raise ValueError(f"Invalid index {file_index} with offset {index}")
         if file_index != self.current_file_index:
