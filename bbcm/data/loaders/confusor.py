@@ -1,8 +1,7 @@
 """
 @Time   :   2021-08-03 17:38:56
 @File   :   confusor.py
-@Author :   okcd00
-@Email  :   okcd00{at}qq.com
+@Author :   pangchaoxu, okcd00
 """
 
 import sys
@@ -11,6 +10,7 @@ sys.path.append("../../")
 import pickle
 from tqdm import tqdm
 import random
+import numpy as np
 from bbcm.utils.pinyin_utils import PinyinUtils
 from bbcm.utils.confuser_utils import (
     generate_score_matrix,
@@ -21,12 +21,13 @@ from bbcm.utils.confuser_utils import (
 )
 
 
-# CONFUSOR_DATA_DIR = '/home/pangchaoxu/'
 CONFUSOR_DATA_DIR = '/data/chendian/'
+# CONFUSOR_DATA_DIR = '/home/pangchaoxu/confusionset/data'
 SCORE_MAT_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/score_data/'
 EMBEDDING_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/sound_tokens/'
 CORPUS_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/pinyin2token.pkl'
 SIGHAN_CFS_PATH = '/home/chendian/BBCM/datasets/sighan_confusion.txt'
+
 
 
 class Confusor(object):
@@ -58,7 +59,7 @@ class Confusor(object):
         self.mode = mode
         self.char_confusion_set = {}
         self.word_confusion_set = {}  # a function is better than a dict
-        self.load_sighan_confusion_set()
+        # self.load_sighan_confusion_set()
         self.load_word_confusion_set()
 
         # pinyin2token corpus
@@ -85,23 +86,6 @@ class Confusor(object):
         # https://github.com/fighting41love/funNLP/tree/master/data
         pass
 
-    def load_embeddings(self, tokens):
-        """
-        Given a list of tokens, return the dict {token: embedding}.
-        """
-        starts = []
-        for t in tokens:
-            start = self.pu.to_pinyin(t)[0]
-            if start not in starts:
-                starts.append(start)
-        print("Load word embeddings.")
-        tok2emb = {}
-        for start in starts:
-            emb_dict = pickle.load(open(EMBEDDING_PATH + start + '.pkl', 'rb'))
-            tok2emb.update(emb_dict)
-        tok_embeddings = {tok: tok2emb[tok] for tok in tokens}
-        return tok_embeddings
-
     def load_score_matrix(self):
         print("Load and generate the score matrix.")
         amb_data = pickle.load(open(SCORE_MAT_PATH + 'amb_data.pkl', 'rb'))
@@ -109,6 +93,43 @@ class Confusor(object):
         self.score_matrix = generate_score_matrix(
             amb_data, self.amb_score, inp_data, self.inp_score)
         return self.score_matrix
+
+    def load_embeddings(self, tokens):
+        """
+        Given a list of tokens, return the dict {token: embedding}.
+        """
+
+        def load_related_emb(tokens):
+            starts = []
+            for t in tokens:
+                start = self.pu.to_pinyin(t[0])[0]
+                if start not in starts:
+                    starts.append(start)
+            tok2emb = {}
+            for start in starts:
+                emb_dict = pickle.load(open(EMBEDDING_PATH + start + '.pkl', 'rb'))
+                tok2emb.update(emb_dict)
+            return tok2emb
+        if self.debug:
+            print("Load word embeddings.")
+        tok2emb = load_related_emb(tokens)
+        tok_embeddings = {}
+        for tok in tokens:
+            emb = tok2emb.get(tok, None)
+            if emb is not None:
+                tok_embeddings[tok] = emb
+            else:
+                hanzis = list(tok)
+                zi2emb = load_related_emb(hanzis)
+                zi_emblist = []
+                for hz in hanzis:
+                    hz_emb = zi2emb.get(hz, None)
+                    if hz_emb is not None:
+                        zi_emblist.append(hz_emb)
+                    else:
+                        raise ValueError("Embedding error: {}, can't find the embedding of {}.".format(tok, hz))
+                tok_embeddings[tok] = np.stack(zi_emblist).mean(axis=0)
+        return tok_embeddings
 
     def get_pinyin_sequence(self, token, corpus, cand_pinyin_num, filter_strategy):
         """
@@ -127,8 +148,10 @@ class Confusor(object):
             filtered_py = list(corpus[len(token)].keys())
         else:
             raise ValueError("invalid filtering strategy: {}".format(filter_strategy))
-        # print("Refined edit distance filtering.")
-        for pyseq in tqdm(filtered_py):
+        if self.debug:
+            print("Refined edit distance filtering.")
+            filtered_py = tqdm(filtered_py)
+        for pyseq in filtered_py:
             score = refined_edit_distance(pinyin, pyseq, self.score_matrix)
             cand_py[pyseq] = score
         top_cand = sorted(cand_py.items(), key=lambda x: x[1])
@@ -139,10 +162,10 @@ class Confusor(object):
         @param corpus: a dict {token_len:{pinyin: [tokens]}}
         @param weight: final_score = -weight * pinyin_score + cosine_similarity
         """
-        cand_p = [p[0] for p in pinyin_scores]
+        # cand_p = [p[0] for p in pinyin_scores]
         candpy2score = {p[0]: p[1] for p in pinyin_scores}
         cand_tokens = [token]
-        for pin in cand_p:
+        for pin in candpy2score:
             cand_tokens.extend(corpus[len(token)][pin])
         tok2emb = self.load_embeddings(cand_tokens)
         filtered_cand_toks = []
@@ -176,4 +199,4 @@ class Confusor(object):
 
 if __name__ == "__main__":
     conf = Confusor(threshold=(0.1, 0.5), filter_strategy='bow', mode='sort')
-    print(conf('其实'))
+    print(conf('庞朝旭'))
