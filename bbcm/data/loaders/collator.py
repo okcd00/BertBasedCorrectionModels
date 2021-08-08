@@ -56,7 +56,8 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
     def random_wrong_ids(self, ct, wrong_id, word_offsets=None):
         ot = deepcopy(ct)
         text_len = ot.__len__()
-        candidate_position = [i for i in range(text_len) if is_chinese_char(ct[i])]
+        candidate_position = [i for i in range(text_len)
+                              if is_chinese_char(ord(ct[i]))]
         n_faulty_position = len(wrong_id)
         wrong_ids = sorted(random.sample(candidate_position,
                                          max(1, n_faulty_position)))
