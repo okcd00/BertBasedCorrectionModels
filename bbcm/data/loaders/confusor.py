@@ -21,13 +21,12 @@ from bbcm.utils.confuser_utils import (
 )
 
 
-# CONFUSOR_DATA_DIR = '/data/chendian/'
-CONFUSOR_DATA_DIR = '/home/pangchaoxu/'
+# CONFUSOR_DATA_DIR = '/home/pangchaoxu/'
+CONFUSOR_DATA_DIR = '/data/chendian/'
 SCORE_MAT_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/score_data/'
 EMBEDDING_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/sound_tokens/'
 CORPUS_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/pinyin2token.pkl'
 SIGHAN_CFS_PATH = '/home/chendian/BBCM/datasets/sighan_confusion.txt'
-
 
 
 class Confusor(object):
@@ -121,11 +120,11 @@ class Confusor(object):
         filter_strategy = filter_strategy.lower()
         # print("Edit distance filtering.")
         if filter_strategy == 'ed':
-            filtered_py = edit_distance_filtering(pinyin, list(corpus[str(len(token))].keys()))
+            filtered_py = edit_distance_filtering(pinyin, list(corpus[len(token)].keys()))
         elif filter_strategy == 'bow':
-            filtered_py = bow_similarity_filtering(pinyin, list(corpus[str(len(token))].keys()))
+            filtered_py = bow_similarity_filtering(pinyin, list(corpus[len(token)].keys()))
         elif filter_strategy == 'no':
-            filtered_py = list(corpus[str(len(token))].keys())
+            filtered_py = list(corpus[len(token)].keys())
         else:
             raise ValueError("invalid filtering strategy: {}".format(filter_strategy))
         # print("Refined edit distance filtering.")
@@ -144,7 +143,7 @@ class Confusor(object):
         candpy2score = {p[0]: p[1] for p in pinyin_scores}
         cand_tokens = [token]
         for pin in cand_p:
-            cand_tokens.extend(corpus[str(len(token))][pin])
+            cand_tokens.extend(corpus[len(token)][pin])
         tok2emb = self.load_embeddings(cand_tokens)
         filtered_cand_toks = []
         for tok in cand_tokens:
@@ -163,7 +162,7 @@ class Confusor(object):
                 pinyin_score = candpy2score[''.join(self.pu.to_pinyin(tok))]
                 final_score = -weight*pinyin_score + cosine_sim
                 cand2score[tok] = final_score
-            sort_cand = sorted(cand2score.items(), key=lambda x:x[1], reverse=True)
+            sort_cand = sorted(cand2score.items(), key=lambda x: x[1], reverse=True)
             return [p[0] for p in sort_cand[1:size + 1]]
         else:
             raise ValueError("invalid mode: {}".format(mode))
@@ -177,4 +176,4 @@ class Confusor(object):
 
 if __name__ == "__main__":
     conf = Confusor(threshold=(0.1, 0.5), filter_strategy='bow', mode='sort')
-    print(conf('庞朝旭'))
+    print(conf('其实'))
