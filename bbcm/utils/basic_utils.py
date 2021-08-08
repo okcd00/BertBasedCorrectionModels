@@ -6,14 +6,11 @@ def lower_bound(arr, x):
     the index of the first number not smaller than x
     :param arr: [0, 2, 5, 8, 10]
     :param x: 2
-    :return:
+    :return: 1
     """
     # binary_search_for_file_index
     i = bisect_left(arr, x)
-    if i:
-        return i
-    else:
-        return 0
+    return i
 
 
 def upper_bound(arr, x):
@@ -21,14 +18,11 @@ def upper_bound(arr, x):
     the index of the first number larger than x
     :param arr: [0, 2, 5, 8, 10]
     :param x: 2
-    :return:
+    :return: 2
     """
     # binary_search_for_file_index
     i = bisect_right(arr, x)
-    if i:
-        return i
-    else:
-        return 0
+    return i
 
 
 if __name__ == '__main__':

@@ -30,7 +30,7 @@ class PureTextDataset(Dataset):
         self.file_sample_count = []
         self.file_offset = [0]
         self.sample_counts = self.count_samples()
-        self.current_file_index = 0
+        self.current_file_index = -1
         self.current_file_samples = []
         print(f"Loaded {self.file_list.__len__()} files from {fp}.")
 
@@ -90,6 +90,7 @@ class PureTextDataset(Dataset):
             file_path = self.file_list[file_index]
             self.current_file_samples = self.read_text_file(file_path)
             self.current_file_index = file_index
-        target_text = self.current_file_samples[index-self.file_offset[file_index]]
+        index_in_file = index-self.file_offset[file_index]
+        target_text = self.current_file_samples[index_in_file]
         # return self.data[index]['original_text'], self.data[index]['correct_text'], self.data[index]['wrong_ids']
         return target_text, target_text, []
