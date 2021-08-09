@@ -5,7 +5,7 @@
 @Email  :   abtion{at}outlook.com
 """
 from torch.utils.data import Dataset
-from bbcm.utils import load_json, dump_json, lower_bound
+from bbcm.utils import load_json, dump_json, lower_bound, highlight_positions
 from glob import glob
 
 import os
@@ -18,6 +18,20 @@ class CscDataset(Dataset):
 
     def __len__(self):
         return len(self.data)
+
+    def show_item(self, tup):
+        if isinstance(tup, int):
+            tup = self[tup]
+        if isinstance(tup, list):
+            highlight_positions(
+                text=tup[0], positions=tup[2], color='blue')
+            highlight_positions(
+                text=tup[1], positions=tup[2], color='blue')
+        elif isinstance(tup, dict):
+            highlight_positions(
+                text=tup['original_text'], positions=tup['wrong_ids'], color='blue')
+            highlight_positions(
+                text=tup['correct_text'], positions=tup['wrong_ids'], color='blue')
 
     def __getitem__(self, index):
         return self.data[index]['original_text'], self.data[index]['correct_text'], self.data[index]['wrong_ids']
@@ -77,6 +91,20 @@ class PureTextDataset(Dataset):
     def binary_search_file_index(a, x):
         # the index of the file for x-th sample.
         return lower_bound(a, x + 1) - 1
+
+    def show_item(self, tup):
+        if isinstance(tup, int):
+            tup = self[tup]
+        if isinstance(tup, list):
+            highlight_positions(
+                text=tup[0], positions=tup[2], color='blue')
+            highlight_positions(
+                text=tup[1], positions=tup[2], color='blue')
+        elif isinstance(tup, dict):
+            highlight_positions(
+                text=tup['original_text'], positions=tup['wrong_ids'], color='blue')
+            highlight_positions(
+                text=tup['correct_text'], positions=tup['wrong_ids'], color='blue')
 
     def __len__(self):
         return self.sample_counts

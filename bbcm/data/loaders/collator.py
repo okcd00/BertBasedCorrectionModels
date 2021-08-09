@@ -2,6 +2,8 @@ import random
 from copy import deepcopy
 
 import torch
+from tqdm import tqdm
+from bbcm.data.datasets.csc import *
 from bbcm.data.loaders.confusor import Confusor
 from bbcm.utils.text_utils import is_chinese_char
 
@@ -39,6 +41,8 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
         super(DynamicDataCollatorForCsc, self).__init__(tokenizer)
         self.first_epoch = True  # False 
         self.augmentation = augmentation
+        self.min_wrong_positions = 1
+        self.min_wrong_positions_rate = 0.0
         self.confusor = Confusor(cand_pinyin_num=10)
 
     def change_words(self, word, correct_word=None, sentence=None):
@@ -60,7 +64,9 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
                               if is_chinese_char(ord(ct[i]))]
         n_faulty_position = len(wrong_id)
         wrong_ids = sorted(random.sample(candidate_position,
-                                         max(1, n_faulty_position)))
+                                         max(n_faulty_position,
+                                             self.min_wrong_positions,
+                                             int(self.min_wrong_positions_rate * text_len))))
         if word_offsets:
             wrong_ids = set(wrong_ids)
             for wid in wrong_ids:
@@ -88,7 +94,9 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
             if wid in done_wid_list:
                 continue
             word_ids = [wid]
-            if word_level and random.random() > 0.5:
+            if word_level:
+                if random.random() > 0.5:
+                    continue  # char or word
                 word_ids = sorted(word_offsets[wid])
                 for wid_in_word in word_ids:
                     if wid_in_word in wr_ids:
@@ -118,23 +126,83 @@ class DynamicDataCollatorForCsc(DataCollatorForCsc):
     def samples(self):
         return [sample for s_idx, sample in enumerate(self)]
 
-    def generate_csc_augmented_samples(self, csc_data_path, random_pos=True):
-        import json
-        csc_origin_data = json.load(open(csc_data_path, 'r'))
+    def load_csc_dataset(self, csc_data_path, csc_data_type='json'):
+        csc_origin_data = []
+        if os.path.exists(csc_data_path):
+            # load from pure text lines
+            dataset_type = PureTextDataset
+            if 'json' in csc_data_type:
+                # csc_origin_data = json.load(open(csc_data_path, 'r'))
+                dataset_type = CscDataset
+            csc_origin_data = dataset_type(csc_data_path)
+        return csc_origin_data
+
+    def generate_csc_augmented_samples(self, csc_origin_data, csc_data_path=None,
+                                       csc_data_type='json', random_pos=True):
+        """
+
+        :param csc_origin_data: a dataset from {PureTextDataset, CscDataset}
+        :param csc_data_path:
+        :param random_pos:
+        :return:
+        """
+        if csc_data_path and (csc_origin_data is None):
+            csc_origin_data = self.load_csc_dataset(
+                csc_data_path=csc_data_path, csc_data_type=csc_data_type)
         augmented_samples = []
-        for sample in csc_origin_data:
-            o = sample['original_text']
-            c = sample['correct_text']
-            w = sample['wrong_ids']
+        for s_idx, sample in enumerate(csc_origin_data):
+            o, c, w = sample
             o_text, c_text, current_wids = self.sample_augment_single(
                 ot=o, ct=c, wrong_id=w, random_pos=random_pos)
             augmented_samples.append({
-                'id': sample['id'],
+                # 'id': sample.get('id'),
+                'id': f"{s_idx}",
                 'original_text': o_text,
                 'wrong_ids': current_wids,
                 'correct_text': c_text,
             })
         return augmented_samples
+
+    def generate_csc_augmented_samples_from_text_dir(self, csc_data_path, output_dir=None):
+        """
+        generate from a too-large pure-text corpus.
+        :param text_path_pattern:
+        :return:
+        """
+        if output_dir is None:
+            output_dir = '/data/sharedata/findoc_csc_samples_210808'
+        csc_origin_data = self.load_csc_dataset(
+            csc_data_path=csc_data_path, csc_data_type='text')
+        augmented_samples = []
+        # n_samples = csc_origin_data.__len__()
+        last_file = ""
+        for s_idx, sample in tqdm(enumerate(csc_origin_data)):
+            # o = sample['original_text']
+            # c = sample['correct_text']
+            # w = sample['wrong_ids']
+            o, c, w = sample
+            # print(o, c, w)
+            o_text, c_text, current_wids = self.sample_augment_single(
+                ot=o, ct=c, wrong_id=w)
+            if csc_origin_data.current_file_index != last_file:
+                out_file = f"{output_dir}/findoc_{csc_origin_data.current_file_index:06}_.json"
+                # if os.path.exists(out_file):  continue  # no overwrite
+                if out_file:
+                    dump_json(augmented_samples, out_file)
+                augmented_samples = []
+                last_file = f"{csc_origin_data.current_file_index}"
+            augmented_samples.append({
+                'id': f"{csc_origin_data.current_file_index}_{s_idx}",
+                'original_text': o_text,
+                'wrong_ids': current_wids,
+                'correct_text': c_text,
+            })
+        else:
+            out_file = f"{output_dir}/findoc_{csc_origin_data.current_file_index:06}_.json"
+            # if os.path.exists(out_file):  continue  # no overwrite
+            if out_file:
+                dump_json(augmented_samples, out_file)
+
 
     def __call__(self, data):
         # return the original samples for the first epoch
