@@ -69,6 +69,24 @@ def bow_similarity_filtering(pinyin, pinyin_corpus, cand_num=10000):
     return [p[0] for p in sort_cand[:cand_num]]
 
 
+def bow_similarity_filtering_new(pinyin, pinyin_corpus, cand_num=10000):
+    """
+    Given a pinyin and a pinyin list, return the filtered pinyin results.
+    """
+    # candpy2score = {p: bow_similarity(p, pinyin) for p in pinyin_corpus}
+    v1 = np.zeros(27)
+    for c in pinyin:
+        v1[zimu2ind(c)] += 1
+    candpy2score = {}
+    for p in tqdm(pinyin_corpus):
+        v2 = np.zeros(27)
+        for c in p:
+            v2[zimu2ind(c)] += 1
+        candpy2score[p] = np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
+    sort_cand = sorted(candpy2score.items(), key=lambda x: x[1], reverse=True)
+    return [p[0] for p in sort_cand[:cand_num]]
+
+
 def generate_score_matrix(amb_data, amb_score, inp_data, inp_score):
     """
     Generate score matrices from pkl files.

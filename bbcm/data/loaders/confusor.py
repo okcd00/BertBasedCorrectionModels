@@ -26,6 +26,7 @@ CONFUSOR_DATA_DIR = '/data/chendian/'
 SCORE_MAT_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/score_data/'
 EMBEDDING_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/sound_tokens/'
 CORPUS_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/pinyin2token.pkl'
+REDSCORE_PATH = f'{CONFUSOR_DATA_DIR}/tencent_embedding/ziREDscore.pkl'
 SIGHAN_CFS_PATH = '/home/chendian/BBCM/datasets/sighan_confusion.txt'
 
 
@@ -33,14 +34,13 @@ SIGHAN_CFS_PATH = '/home/chendian/BBCM/datasets/sighan_confusion.txt'
 class Confusor(object):
     def __init__(self, amb_score=0.5, inp_score=0.25, threshold=(0.2, 0.5),
                  cand_pinyin_num=10, weight=0.5, conf_size=10,
-                 filter_strategy='bow', mode='sort', debug=False):
+                 mode='sort', debug=False):
         """
         @param amb_score: [0, 1) score of the ambiguous sounds.
         @param inp_score: [0, 1) score of the input errors.
         @param cand_pinyin_num: the number of candidate pinyin sequences.
         @param threshold: the threshold of the cosine similarity filtering.
         @param mode: {'sort', 'random'} the 'sort' mode sorts candidates by weighted scores.
-        @param filter_strategy: {'bow', 'ED', 'no'} 'bow' for bow similarity filtering; 'ED' for edit distance filtering.
         @param weight: final_score = -weight * pinyin_score + cosine_similarity.
         @param conf_size: the size of confusion set.
         """
@@ -51,11 +51,9 @@ class Confusor(object):
         self.cand_pinyin_num = cand_pinyin_num
         self.weight = weight
         self.conf_size = conf_size
-        self.filter_strategy = filter_strategy
         self.pu = PinyinUtils()
 
         print("Use {} mode.".format(mode))
-        print("Use {} filtering strategy.".format(filter_strategy))
         self.mode = mode
         self.char_confusion_set = {}
         self.word_confusion_set = {}  # a function is better than a dict
@@ -65,6 +63,9 @@ class Confusor(object):
         # pinyin2token corpus
         print("Now loading pinyin2token corpus.")
         self.corpus = pickle.load(open(CORPUS_PATH, 'rb'))
+
+        print("Now loading ziREDscore.")
+        self.ziREDscore = pickle.load(open(REDSCORE_PATH, 'rb'))
 
         # load and generate the score matrix
         print("Now generating score matrix.")
@@ -110,8 +111,8 @@ class Confusor(object):
                 emb_dict = pickle.load(open(EMBEDDING_PATH + start + '.pkl', 'rb'))
                 tok2emb.update(emb_dict)
             return tok2emb
-        if self.debug:
-            print("Load word embeddings.")
+
+        print("Load word embeddings.")
         tok2emb = load_related_emb(tokens)
         tok_embeddings = {}
         for tok in tokens:
@@ -131,42 +132,58 @@ class Confusor(object):
                 tok_embeddings[tok] = np.stack(zi_emblist).mean(axis=0)
         return tok_embeddings
 
-    def get_pinyin_sequence(self, token, corpus, cand_pinyin_num, filter_strategy):
+    def get_pinyin_sequence(self, token, corpus, cand_pinyin_num, ziREDscore):
         """
-        @param corpus: a dict {token_len:{pinyin: [tokens]}}
+        @param corpus: a dict {token_len: {pinyin: {'tokens': [tokens], 'pylist':pinyin list}}
         @return: The top-down pinyin sequences.
         """
-        pinyin = ''.join(self.pu.to_pinyin(token))
+
+        def complete_ziRED(newpy, ziREDscore):
+            """
+            If new pinyin appears, update the ziREDscore and save it to the default path.
+            """
+            print("new pinyin: {}, update ziREDscore".format(newpy))
+            ziREDscore[newpy] = {}
+            ziREDscore[newpy][newpy] = 0
+            for oldpy in ziREDscore.keys():
+                score = refined_edit_distance(newpy, oldpy, self.score_matrix)
+                ziREDscore[newpy][oldpy] = score
+                ziREDscore[oldpy][newpy] = score
+            return ziREDscore
+
+        pinyin = self.pu.to_pinyin(token)
+        candpylist = {py: toks['pylist'] for py, toks in corpus[len(token)].items()}
+        updated = False
         cand_py = {}
-        filter_strategy = filter_strategy.lower()
-        # print("Edit distance filtering.")
-        if filter_strategy == 'ed':
-            filtered_py = edit_distance_filtering(pinyin, list(corpus[len(token)].keys()))
-        elif filter_strategy == 'bow':
-            filtered_py = bow_similarity_filtering(pinyin, list(corpus[len(token)].keys()))
-        elif filter_strategy == 'no':
-            filtered_py = list(corpus[len(token)].keys())
-        else:
-            raise ValueError("invalid filtering strategy: {}".format(filter_strategy))
-        if self.debug:
-            print("Refined edit distance filtering.")
-            filtered_py = tqdm(filtered_py)
-        for pyseq in filtered_py:
-            score = refined_edit_distance(pinyin, pyseq, self.score_matrix)
-            cand_py[pyseq] = score
+        for py, pylist in tqdm(candpylist.items()):
+            assert len(pylist) == len(pinyin)
+            scores = []
+            for i in range(len(pinyin)):
+                fpy = pylist[i]
+                spy = pinyin[i]
+                if fpy not in ziREDscore:
+                    ziREDscore = complete_ziRED(fpy, ziREDscore)
+                    updated = True
+                if spy not in ziREDscore:
+                    ziREDscore = complete_ziRED(spy, ziREDscore)
+                    updated = True
+                scores.append(ziREDscore[fpy][spy])
+            cand_py[py] = sum(scores)
         top_cand = sorted(cand_py.items(), key=lambda x: x[1])
+        if updated:
+            print("save new ziREDscore to path: {}".format(REDSCORE_PATH))
+            pickle.dump(ziREDscore, open(REDSCORE_PATH, 'wb'))
         return top_cand[:cand_pinyin_num]
 
     def get_confuse_tokens(self, token, corpus, pinyin_scores, threshold, mode, weight, size):
         """
-        @param corpus: a dict {token_len:{pinyin: [tokens]}}
+        @param corpus: a dict {token_len: {pinyin: {'tokens': [tokens], 'pylist':pinyin list}}
         @param weight: final_score = -weight * pinyin_score + cosine_similarity
         """
-        # cand_p = [p[0] for p in pinyin_scores]
         candpy2score = {p[0]: p[1] for p in pinyin_scores}
         cand_tokens = [token]
         for pin in candpy2score:
-            cand_tokens.extend(corpus[len(token)][pin])
+            cand_tokens.extend(corpus[len(token)][pin]['tokens'])
         tok2emb = self.load_embeddings(cand_tokens)
         filtered_cand_toks = []
         for tok in cand_tokens:
@@ -191,12 +208,12 @@ class Confusor(object):
             raise ValueError("invalid mode: {}".format(mode))
 
     def __call__(self, word, context=None, word_position=None):
-        cand_pinyin = self.get_pinyin_sequence(word, self.corpus, self.cand_pinyin_num, self.filter_strategy)
+        cand_pinyin = self.get_pinyin_sequence(word, self.corpus, self.cand_pinyin_num, self.ziREDscore)
         confusion_set = self.get_confuse_tokens(word, self.corpus, cand_pinyin, self.threshold, self.mode,
                                                 self.weight, self.conf_size)
         return confusion_set
 
 
 if __name__ == "__main__":
-    conf = Confusor(threshold=(0.1, 0.5), filter_strategy='bow', mode='sort')
+    conf = Confusor(threshold=(0.1, 0.5), mode='sort')
     print(conf('庞朝旭'))
